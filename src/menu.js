@@ -3,6 +3,7 @@ import { onAuthStateChanged, signOut, sendPasswordResetEmail } from "firebase/au
 import { collection, getDocs, doc, updateDoc, deleteDoc, getDoc } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { showLoader, hideLoader } from './loader.js';
+import { subtractDuration, normalizeUsername } from './utils.js';
 
 
 import Chart from 'chart.js/auto';
@@ -126,8 +127,29 @@ document.addEventListener('DOMContentLoaded', () => {
             // Set User Display
             displayUsername.textContent = user.displayName || user.email.split('@')[0];
 
-            showLoader('Sincronizando datos...');
+            showLoader('Verificando acceso...');
             try {
+                // ── RBAC: Only admin, supervisor and usuario can enter ──────
+                const username = user.email.split('@')[0].toLowerCase();
+                const userDoc = await getDoc(doc(db, 'usuarios', username));
+
+                if (!userDoc.exists()) {
+                    await signOut(auth);
+                    window.location.href = 'index.html?error=no-profile';
+                    return;
+                }
+
+                const role = (userDoc.data().tipo || '').toLowerCase();
+                const allowed = ['admin', 'administrador', 'supervisor', 'usuario'];
+
+                if (!allowed.includes(role)) {
+                    await signOut(auth);
+                    window.location.href = 'index.html?error=unauthorized-role';
+                    return;
+                }
+
+                // ── Continue with data load if authorized ──────────────────
+                showLoader('Sincronizando datos...');
                 const snapshot = await getDocs(collection(db, "tareas"));
                 rawData = snapshot.docs.map(doc => {
                     const d = doc.data();
@@ -135,7 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         id: doc.id,
                         ...d,
                         // Normalization
-                        userName: (d.userName || d.userEmail || 'Anonimo').split('@')[0],
+                        userName: normalizeUsername(d.userName || d.userEmail),
                         date: d.fecha ? new Date(d.fecha) : null,
                         cliente: d.cliente || 'Sin Asignar',
                         unidad: d.unidad || 'General',
@@ -158,9 +180,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 hideLoader(300);
 
             } catch (err) {
-                console.error("Data Load Error:", err);
+                if (import.meta.env.DEV) console.error('[menu] Data Load Error:', err);
                 hideLoader();
-                loadingDiv.innerHTML = `<i class='bx bxs-error-circle'></i> Error al cargar datos: ${err.message}`;
+                loadingDiv.innerHTML = `<i class='bx bxs-error-circle'></i> Error al cargar datos. Recarga la página.`;
             }
         }
     });
@@ -632,22 +654,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return [hi, hf, tarea, a.comentarios || '-'];
     }
 
-    // Helper: Calculate start hour subtracting duration string (e.g. '1h 38m')
-    function subtractDuration(horaFin, duracion) {
-        if (!horaFin || !duracion) return '-';
-        try {
-            const [h, m, s] = horaFin.split(':').map(Number);
-            const match = duracion.match(/(\d+)h\s*(\d*)m?/);
-            if (!match) return horaFin;
-            const dh = parseInt(match[1]) || 0;
-            const dm = parseInt(match[2]) || 0;
-            let totalMin = h * 60 + m - (dh * 60 + dm);
-            if (totalMin < 0) totalMin += 24 * 60;
-            const rh = Math.floor(totalMin / 60).toString().padStart(2, '0');
-            const rm = (totalMin % 60).toString().padStart(2, '0');
-            return `${rh}:${rm}:${(s || 0).toString().padStart(2, '0')}`;
-        } catch { return horaFin; }
-    }
+    // (subtractDuration is now imported from utils.js)
+
 
     function updateCharts(counts) {
         const FONT = "'Orbitron', 'Inter', sans-serif";
@@ -1372,8 +1380,8 @@ const NEON_MAP_STYLE = {
             });
             setStatus('Selecciona un cliente', false);
         } catch (e) {
-            setStatus('Error cargando clientes', false);
-            console.error(e);
+            setStatus('Error cargando clientes. Intenta de nuevo.', false);
+            if (import.meta.env.DEV) console.error('[menu] clientes:', e);
         }
 
         selClient.addEventListener('change', async () => {
@@ -1401,7 +1409,8 @@ const NEON_MAP_STYLE = {
                 unitGroup.style.pointerEvents = 'auto';
                 setStatus(`${snap.size} unidad(es) disponibles`, true);
             } catch (e) {
-                setStatus('Error cargando unidades', false); console.error(e);
+                setStatus('Error cargando unidades. Intenta de nuevo.', false);
+                if (import.meta.env.DEV) console.error('[menu] unidades:', e);
             }
         });
 
@@ -1443,7 +1452,8 @@ const NEON_MAP_STYLE = {
                 clearMsg();
             } catch (e) {
                 hideLoader();
-                setStatus('Error cargando campos', false); console.error(e);
+                setStatus('Error cargando datos de la unidad. Intenta de nuevo.', false);
+                if (import.meta.env.DEV) console.error('[menu] unit load:', e);
             }
         });
 
@@ -1490,9 +1500,9 @@ const NEON_MAP_STYLE = {
                 saveMsg.className = 'unit-save-msg success';
                 setStatus(`Guardado: ${inNombre.value.trim()}`, true);
             } catch (e) {
-                saveMsg.textContent = `\u2717 Error al guardar: ${e.message}`;
+                saveMsg.textContent = `\u2717 Error al guardar cambios. Intenta de nuevo.`;
                 saveMsg.className = 'unit-save-msg error';
-                console.error(e);
+                if (import.meta.env.DEV) console.error('[menu] save unit:', e);
             } finally {
                 saveBtn.disabled = false;
                 saveBtn.innerHTML = `<i class='bx bx-save'></i><span>GUARDAR CAMBIOS</span>`;
@@ -1623,19 +1633,24 @@ const NEON_MAP_STYLE = {
         async function loadUsers() {
             showLoader('Cargando usuarios...');
             showSkeleton();
-            setStatus('Cargando usuarios desde Firestore...');
+            setStatus('Consultando permisos...');
             if (totalCount) totalCount.textContent = '...';
 
             try {
-                // 1. Load all docs from "usuarios" collection
-                const snap = await getDocs(collection(db, 'usuarios'));
+                // Securely fetch filtered list via Cloud Function
+                const functions = getFunctions(auth.app, 'us-central1');
+                const getUsers = httpsCallable(functions, 'getUsersList');
+
+                const result = await getUsers();
+                const usersData = result.data.users || [];
+
                 _allUsers = [];
 
-                snap.forEach(d => {
-                    const data = d.data();
-                    const uid = d.id;   // e.g. "jsolis"
+                usersData.forEach(u => {
+                    const data = u; // Function already sends formatted data
+                    const uid = u.id;
 
-                    // Derive email: use stored email OR reconstruct from username + current user's domain
+                    // Derive email
                     const currentUserEmail = auth.currentUser?.email || '';
                     const domain = currentUserEmail.includes('@') ? currentUserEmail.slice(currentUserEmail.indexOf('@')) : '';
                     const email = data.email || data.correo || (uid && domain ? uid + domain : '');
@@ -1652,17 +1667,25 @@ const NEON_MAP_STYLE = {
 
                 renderTable(_allUsers);
                 if (totalCount) totalCount.textContent = _allUsers.length;
-                setStatus(`${_allUsers.length} usuario(s) registrado(s)`);
+
+                if (_allUsers.length === 0) {
+                    setStatus('No tienes permisos para ver usuarios o la lista está vacía.');
+                } else {
+                    setStatus(`${_allUsers.length} usuario(s) visible(s)`);
+                }
                 hideLoader(200);
 
             } catch (e) {
+                if (import.meta.env.DEV) console.error('[menu] getUsersList error:', e);
                 hideLoader();
-                setStatus('Error cargando usuarios');
+                setStatus('Error de seguridad al cargar usuarios.');
                 tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:#ff1744;padding:24px">
-                    Error: ${e.message}</td></tr>`;
-                console.error(e);
+                    <i class='bx bx-lock-alt' style="font-size:2rem"></i><br>
+                    Acceso restringido o error de conexión.
+                </td></tr>`;
             }
         }
+
 
 
         //  Render table 
@@ -1690,7 +1713,7 @@ const NEON_MAP_STYLE = {
                         </div>
                     </td>
                     <td class="uv-email-cell">${emailDisplay}</td>
-                    <td>${u.nombres || '<span style="color:rgba(255,255,255,.3)"></span>'}</td>
+                    <td>${u.nombres || '<span style="color:rgba(255,255,255,.3)">-</span>'}</td>
                     <td>${typeBadge(u.tipo)}</td>
                     <td>
                         <div class="uv-actions">
@@ -1762,7 +1785,7 @@ const NEON_MAP_STYLE = {
             if (!nombres) { setModalMsg(meditMsg, 'El nombre es requerido.'); return; }
 
             meditSave.disabled = true;
-            meditSave.innerHTML = `<i class="bx bx-loader-alt bx-spin"></i> Guardando...`;
+            meditSave.innerHTML = `< i class="bx bx-loader-alt bx-spin" ></i > Guardando...`;
 
             try {
                 const ref = doc(db, 'usuarios', _editingId);
@@ -1790,7 +1813,7 @@ const NEON_MAP_STYLE = {
                 console.error(e);
             } finally {
                 meditSave.disabled = false;
-                meditSave.innerHTML = `<i class="bx bx-save"></i> Guardar Cambios`;
+                meditSave.innerHTML = `< i class= "bx bx-save" ></i > Guardar Cambios`;
             }
         });
 
@@ -1805,7 +1828,7 @@ const NEON_MAP_STYLE = {
             if (!_editingId) return;
             clearModalMsg(mdelMsg);
             mdelConfirm.disabled = true;
-            mdelConfirm.innerHTML = `<i class="bx bx-loader-alt bx-spin"></i> Eliminando...`;
+            mdelConfirm.innerHTML = `< i class= "bx bx-loader-alt bx-spin" ></i > Eliminando...`;
 
             try {
                 await deleteDoc(doc(db, 'usuarios', _editingId));
@@ -1820,7 +1843,7 @@ const NEON_MAP_STYLE = {
                 console.error(e);
             } finally {
                 mdelConfirm.disabled = false;
-                mdelConfirm.innerHTML = `<i class="bx bx-trash"></i> Si, Eliminar`;
+                mdelConfirm.innerHTML = `< i class= "bx bx-trash" ></i > Si, Eliminar`;
             }
         });
 
@@ -1882,7 +1905,7 @@ const NEON_MAP_STYLE = {
                 if (!input) return;
                 const show = input.type === 'password';
                 input.type = show ? 'text' : 'password';
-                btn.innerHTML = show ? `<i class="bx bx-hide"></i>` : `<i class="bx bx-show"></i>`;
+                btn.innerHTML = show ? `< i class= "bx bx-hide" ></i > ` : ` < i class= "bx bx-show" ></i > `;
             });
         });
 
@@ -1913,7 +1936,7 @@ const NEON_MAP_STYLE = {
             }
 
             mpwdSend.disabled = true;
-            mpwdSend.innerHTML = `<i class="bx bx-loader-alt bx-spin"></i> Cambiando...`;
+            mpwdSend.innerHTML = `< i class= "bx bx-loader-alt bx-spin" ></i > Cambiando...`;
 
             try {
                 const functions = getFunctions(undefined, 'us-central1');
@@ -1927,7 +1950,7 @@ const NEON_MAP_STYLE = {
                 console.error(e);
             } finally {
                 mpwdSend.disabled = false;
-                mpwdSend.innerHTML = `<i class="bx bx-key"></i> Cambiar Contraseña`;
+                mpwdSend.innerHTML = `< i class= "bx bx-key" ></i > Cambiar Contraseña`;
             }
         });
 

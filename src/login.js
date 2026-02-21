@@ -176,6 +176,33 @@ document.addEventListener('DOMContentLoaded', () => {
     const errorMessage = document.getElementById('error-message');
     const loginBtn = document.getElementById('login-btn');
 
+    // ── Handle redirect errors (RBAC) ─────────────────────────────
+    const urlParams = new URLSearchParams(window.location.search);
+    const errCode = urlParams.get('error');
+    if (errCode === 'no-profile') {
+        errorMessage.textContent = 'Tu cuenta no tiene un perfil configurado en el sistema.';
+    } else if (errCode === 'unauthorized-role') {
+        errorMessage.textContent = 'Tu rol no tiene permisos para acceder a este panel.';
+    }
+
+    // ── Client-side rate limit: max 5 attempts per 2 minutes ──────
+    const RATE_LIMIT = 5;
+    const RATE_WINDOW = 2 * 60 * 1000; // 2 min in ms
+    let attemptCount = 0;
+    let rateResetTimer = null;
+
+    function isRateLimited() {
+        if (attemptCount >= RATE_LIMIT) return true;
+        attemptCount++;
+        if (!rateResetTimer) {
+            rateResetTimer = setTimeout(() => {
+                attemptCount = 0;
+                rateResetTimer = null;
+            }, RATE_WINDOW);
+        }
+        return false;
+    }
+
     // Auto-redirect if already logged in (with warp)
     onAuthStateChanged(auth, (user) => {
         if (user) {
@@ -186,8 +213,20 @@ document.addEventListener('DOMContentLoaded', () => {
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
 
-        const email = emailInput.value.trim();
-        const password = passwordInput.value;
+        // Rate limit check
+        if (isRateLimited()) {
+            errorMessage.textContent = 'Demasiados intentos. Espera 2 minutos antes de intentar de nuevo.';
+            return;
+        }
+
+        // Trim inputs (prevents accidental spaces leaking)
+        const email = emailInput.value.trim().toLowerCase();
+        const password = passwordInput.value.trim();
+
+        if (!email || !password) {
+            errorMessage.textContent = 'Por favor completa todos los campos.';
+            return;
+        }
 
         loginBtn.disabled = true;
         loginBtn.textContent = 'VERIFICANDO...';
@@ -197,8 +236,11 @@ document.addEventListener('DOMContentLoaded', () => {
             await signInWithEmailAndPassword(auth, email, password);
             // onAuthStateChanged will fire and call launchWarpAndGo
         } catch (error) {
-            console.error(error);
+            // Only log to console in dev — never expose raw error to user
+            if (import.meta.env.DEV) console.error('[login]', error.code, error.message);
             errorMessage.textContent = getErrorMessage(error.code);
+        } finally {
+            // Always re-enable button regardless of outcome
             loginBtn.disabled = false;
             loginBtn.textContent = 'INICIAR SESIÓN';
         }
