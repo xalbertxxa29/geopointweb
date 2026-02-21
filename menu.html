@@ -1,0 +1,774 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Liderman Tecnología</title>
+    <link rel="stylesheet" href="./src/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Orbitron:wght@400;700&display=swap"
+        rel="stylesheet">
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-wrapper">
+                    <img src="./imagenes/logo.png" alt="GeoPoint" class="sidebar-logo" />
+                </div>
+                <h2 class="brand-name">Control Zonales</h2>
+            </div>
+
+            <nav class="sidebar-nav">
+                <ul class="nav-list">
+                    <li class="nav-item active">
+                        <a href="#" class="nav-link">
+                            <i class='bx bxs-dashboard'></i>
+                            <span class="link-text">Dashboard</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <i class='bx bxs-report'></i>
+                            <span class="link-text">Reportes</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <i class='bx bxs-map-pin'></i>
+                            <span class="link-text">Gestión</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <i class='bx bxs-user-detail'></i>
+                            <span class="link-text">Usuarios</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <i class='bx bxs-cog'></i>
+                            <span class="link-text">Configuración</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button class="logout-btn" id="logout-btn">
+                    <i class='bx bx-log-out'></i>
+                    <span class="link-text">Cerrar Sesión</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Top Header -->
+            <header class="top-header glass-effect">
+                <div class="header-left">
+                    <button id="sidebar-toggle" class="toggle-btn">
+                        <i class='bx bx-menu'></i>
+                    </button>
+                    <h1 class="page-title">Indicadores Operativos</h1>
+                </div>
+
+                <div class="header-right">
+                    <div class="user-profile">
+                        <div class="user-avatar">
+                            <i class='bx bxs-user'></i>
+                        </div>
+                        <span class="user-name" id="display-username">Admin</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Scrollable Content -->
+            <div class="content-scroll">
+                <div class="dashboard-wrapper">
+
+                    <div id="loading" class="loading-container">
+                        <div class="spiral-loader small"></div>
+                        <span>Sincronizando datos...</span>
+                    </div>
+
+                    <!-- Filters Panel -->
+                    <div class="glass-panel filter-panel" id="filter-section" style="display: none;">
+                        <div class="panel-header">
+                            <i class='bx bx-filter-alt'></i>
+                            <h3>Filtros de Búsqueda</h3>
+                        </div>
+                        <div class="filter-controls">
+                            <div class="filter-group">
+                                <label>Rango de Fechas</label>
+                                <div class="date-inputs">
+                                    <input type="date" id="date-start" class="modern-input">
+                                    <span class="separator">to</span>
+                                    <input type="date" id="date-end" class="modern-input">
+                                </div>
+                            </div>
+                            <div class="filter-group">
+                                <label>Cliente</label>
+                                <div class="select-wrapper">
+                                    <select id="filter-client" class="modern-select">
+                                        <option value="">Todos los Clientes</option>
+                                    </select>
+                                    <i class='bx bx-chevron-down'></i>
+                                </div>
+                            </div>
+                            <div class="filter-group">
+                                <label>Unidad</label>
+                                <div class="select-wrapper">
+                                    <select id="filter-unit" class="modern-select">
+                                        <option value="">Todas las Unidades</option>
+                                    </select>
+                                    <i class='bx bx-chevron-down'></i>
+                                </div>
+                            </div>
+                            <div class="filter-group">
+                                <label>Usuario</label>
+                                <div class="select-wrapper">
+                                    <select id="filter-user" class="modern-select">
+                                        <option value="">Todos los Usuarios</option>
+                                    </select>
+                                    <i class='bx bx-chevron-down'></i>
+                                </div>
+                            </div>
+                            <button id="apply-filters" class="btn-primary">
+                                <i class='bx bx-check'></i> Aplicar
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- KPI Charts Grid -->
+                    <div class="indicators-grid" id="indicators-grid" style="display: none;">
+                        <!-- Client Indicators -->
+                        <div class="glass-card full-span">
+                            <div class="card-header">
+                                <h3><i class='bx bxs-business'></i> Distribución por Cliente</h3>
+                                <button class="card-action"><i class='bx bx-dots-vertical-rounded'></i></button>
+                            </div>
+                            <div class="chart-container large">
+                                <canvas id="chart-clientes"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Unit Indicators -->
+                        <div class="glass-card">
+                            <div class="card-header">
+                                <h3><i class='bx bxs-buildings'></i> Por Unidad</h3>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="chart-unidades"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- User Indicators -->
+                        <div class="glass-card">
+                            <div class="card-header">
+                                <h3><i class='bx bxs-user-account'></i> Top Usuarios</h3>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="chart-usuarios"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Reports Section (Initially Hidden) -->
+                    <div id="reports-view" style="display: none;">
+                        <div class="glass-panel table-section">
+                            <div class="panel-header">
+                                <h3><i class='bx bxs-file-pdf'></i> Generación de Reportes</h3>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="modern-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Fecha</th>
+                                            <th>Cliente</th>
+                                            <th>Unidad</th>
+                                            <th>Usuario</th>
+                                            <th>Tarea</th>
+                                            <th>Estadía</th>
+                                            <th>Estado</th>
+                                            <th>Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="reports-table-body">
+                                        <!-- Dynamically filled -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Units Management View -->
+                    <div id="units-view" style="display:none;">
+
+                        <!-- Selectors card -->
+                        <div class="glass-panel unit-selector-panel">
+                            <div class="panel-header">
+                                <h3><i class='bx bxs-map-pin'></i> Gestión de Unidades</h3>
+                                <div class="unit-selector-status" id="unit-selector-status">
+                                    <span class="status-dot"></span>
+                                    <span id="unit-status-text">Selecciona un cliente</span>
+                                </div>
+                            </div>
+                            <div class="unit-selectors">
+                                <div class="unit-select-group">
+                                    <label><i class='bx bxs-business'></i> CLIENTE</label>
+                                    <div class="unit-select-wrapper">
+                                        <select id="unit-filter-client" class="unit-modern-select">
+                                            <option value="">-- Seleccionar Cliente --</option>
+                                        </select>
+                                        <i class='bx bx-chevron-down unit-sel-arrow'></i>
+                                    </div>
+                                </div>
+                                <div class="unit-select-group" id="unit-sel-unit-group"
+                                    style="opacity:.4;pointer-events:none;">
+                                    <label><i class='bx bxs-buildings'></i> UNIDAD</label>
+                                    <div class="unit-select-wrapper">
+                                        <select id="unit-filter-unit" class="unit-modern-select">
+                                            <option value="">-- Seleccionar Unidad --</option>
+                                        </select>
+                                        <i class='bx bx-chevron-down unit-sel-arrow'></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Unit detail editor -->
+                        <div id="unit-editor" class="unit-editor-card" style="display:none;">
+                            <div class="unit-editor-header">
+                                <div class="unit-editor-title">
+                                    <i class='bx bxs-map-pin'></i>
+                                    <span id="unit-editor-name">—</span>
+                                </div>
+                                <div class="unit-editor-badge">EDICIÓN ACTIVA</div>
+                            </div>
+
+                            <!-- Read-only fields -->
+                            <div class="unit-fields-section">
+                                <div class="unit-section-label"><i class='bx bx-lock'></i> Campos de solo lectura</div>
+                                <div class="unit-fields-readonly">
+                                    <div class="unit-field-readonly">
+                                        <span class="unit-field-key">Fecha Creación</span>
+                                        <span class="unit-field-val" id="uv-fechacreacion">—</span>
+                                    </div>
+                                    <div class="unit-field-readonly">
+                                        <span class="unit-field-key">Timestamp</span>
+                                        <span class="unit-field-val" id="uv-timestamp">—</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Editable fields + Map -->
+                            <div class="unit-fields-section">
+                                <div class="unit-section-label editable"><i class='bx bx-edit'></i> Campos editables
+                                </div>
+                                <div class="unit-edit-map-layout">
+
+                                    <!-- Left: inputs -->
+                                    <div class="unit-fields-editable-col">
+                                        <div class="unit-field-edit">
+                                            <label for="ue-nombre"><i class='bx bx-tag'></i> Nombre</label>
+                                            <input type="text" id="ue-nombre" class="unit-input"
+                                                placeholder="Nombre de la unidad">
+                                        </div>
+                                        <div class="unit-field-edit">
+                                            <label for="ue-grupo"><i class='bx bx-layer'></i> Grupo</label>
+                                            <input type="text" id="ue-grupo" class="unit-input"
+                                                placeholder="Nombre del grupo">
+                                        </div>
+                                        <div class="unit-field-edit">
+                                            <label for="ue-lat"><i class='bx bx-current-location'></i> Latitud</label>
+                                            <input type="number" id="ue-lat" class="unit-input" step="any"
+                                                placeholder="-12.0944314">
+                                        </div>
+                                        <div class="unit-field-edit">
+                                            <label for="ue-lng"><i class='bx bx-current-location'></i> Longitud</label>
+                                            <input type="number" id="ue-lng" class="unit-input" step="any"
+                                                placeholder="-77.035288">
+                                        </div>
+                                        <p class="unit-map-hint"><i class='bx bx-info-circle'></i> Arrastra el marcador
+                                            en el mapa o edita los campos para actualizar la ubicación.</p>
+                                    </div>
+
+                                    <!-- Right: map -->
+                                    <div class="unit-map-wrapper">
+                                        <div class="unit-map-frame">
+                                            <div id="unit-map"></div>
+                                            <div class="unit-map-crosshair-label">
+                                                <i class='bx bxs-map-pin'></i> Arrastra el pin para mover
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+
+                            <!-- Actions bar -->
+                            <div class="unit-editor-actions">
+                                <div id="unit-save-msg" class="unit-save-msg"></div>
+                                <button id="unit-cancel-btn" class="unit-cancel-btn">
+                                    <i class='bx bx-undo'></i>
+                                    <span>CANCELAR</span>
+                                </button>
+                                <button id="unit-save-btn" class="unit-save-btn">
+                                    <i class='bx bx-save'></i>
+                                    <span>GUARDAR CAMBIOS</span>
+                                </button>
+                            </div>
+                        </div>
+
+
+                    </div><!-- /units-view -->
+
+                    <!-- ═══════ USUARIOS VIEW ═══════ -->
+                    <div id="usuarios-view" class="uv-root" style="display:none;" aria-label="Gestión de Usuarios">
+
+                        <!-- Header bar -->
+                        <div class="uv-header">
+                            <div class="uv-header-left">
+                                <div class="uv-icon-wrap"><i class='bx bxs-user-detail'></i></div>
+                                <div>
+                                    <h2 class="uv-title">Gestión de Usuarios</h2>
+                                    <p class="uv-subtitle">Administra cuentas y permisos del sistema</p>
+                                </div>
+                            </div>
+                            <div class="uv-header-right">
+                                <div class="uv-stat" id="uv-count-badge">
+                                    <span id="uv-total-count">0</span>
+                                    <span class="uv-stat-label">Usuarios</span>
+                                </div>
+                                <button class="uv-refresh-btn" id="uv-refresh-btn" title="Recargar">
+                                    <i class='bx bx-refresh'></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Search + filter bar -->
+                        <div class="uv-toolbar">
+                            <div class="uv-search-wrap">
+                                <i class='bx bx-search uv-search-icon'></i>
+                                <input type="text" id="uv-search" class="uv-search-input"
+                                    placeholder="Buscar por nombre, usuario o correo…" autocomplete="off">
+                            </div>
+                            <div class="uv-filter-group">
+                                <select id="uv-type-filter" class="uv-select">
+                                    <option value="">Todos los tipos</option>
+                                    <option value="admin">Admin</option>
+                                    <option value="operador">Operador</option>
+                                    <option value="supervisor">Supervisor</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Status bar -->
+                        <div class="uv-status-bar" id="uv-status-bar">
+                            <span class="uv-status-dot"></span>
+                            <span id="uv-status-text">Cargando usuarios…</span>
+                        </div>
+
+                        <!-- Users table -->
+                        <div class="uv-table-wrap">
+                            <table class="uv-table" id="uv-table">
+                                <thead>
+                                    <tr>
+                                        <th><i class='bx bxs-user'></i> Usuario</th>
+                                        <th><i class='bx bx-envelope'></i> Correo</th>
+                                        <th><i class='bx bx-id-card'></i> Nombre Completo</th>
+                                        <th><i class='bx bx-shield'></i> Tipo</th>
+                                        <th><i class='bx bx-dots-horizontal-rounded'></i> Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="uv-tbody">
+                                    <!-- Dynamically filled -->
+                                </tbody>
+                            </table>
+                            <div class="uv-empty" id="uv-empty" style="display:none;">
+                                <i class='bx bx-user-x'></i>
+                                <p>No se encontraron usuarios</p>
+                            </div>
+                        </div>
+
+                    </div><!-- /usuarios-view -->
+
+
+                    <div class="glass-panel table-section" id="table-section" style="display: none;">
+                        <div class="panel-header">
+                            <h3><i class='bx bx-list-ul'></i> Registro Detallado</h3>
+                            <button class="btn-icon"><i class='bx bx-export'></i></button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="modern-table">
+                                <thead>
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Cliente</th>
+                                        <th>Unidad</th>
+                                        <th>Usuario</th>
+                                        <th>Tarea</th>
+                                        <th>Estadía</th>
+                                        <th>Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="table-body">
+                                    <!-- Dynamically filled -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <footer class="dashboard-footer">
+                    <p>Liderman Soluciones Tecnologicas &copy; 2026</p>
+                </footer>
+            </div>
+        </main>
+    </div>
+
+    <script type="module" src="./src/menu.js"></script>
+    <script type="module">
+        import { initSpaceBg } from './src/space-bg.js';
+        document.addEventListener('DOMContentLoaded', initSpaceBg);
+    </script>
+
+    <!-- MODAL EDITAR -->
+    <div class="uv-modal-overlay" id="modal-edit-overlay" aria-hidden="true">
+        <div class="uv-modal" role="dialog">
+            <div class="uv-modal-header">
+                <div class="uv-modal-icon uv-icon-edit"><i class='bx bx-edit'></i></div>
+                <h3>Editar Usuario</h3>
+                <button class="uv-modal-close" data-close="modal-edit-overlay"><i class='bx bx-x'></i></button>
+            </div>
+            <div class="uv-modal-body">
+                <div class="uv-modal-user-badge" id="medit-user-badge"></div>
+                <div class="uv-form-grid">
+                    <div class="uv-form-group">
+                        <label for="medit-nombres"><i class='bx bx-user'></i> Nombre Completo</label>
+                        <input type="text" id="medit-nombres" class="uv-form-input" placeholder="Juan Alberto Solis">
+                    </div>
+                    <div class="uv-form-group">
+                        <label for="medit-tipo"><i class='bx bx-shield'></i> Tipo / Rol</label>
+                        <select id="medit-tipo" class="uv-form-select">
+                            <option value="admin">Admin</option>
+                            <option value="operador">Operador</option>
+                            <option value="supervisor">Supervisor</option>
+                            <option value="cliente">Cliente</option>
+                        </select>
+                    </div>
+                    <div class="uv-form-group uv-full">
+                        <label for="medit-email"><i class='bx bx-envelope'></i> Correo Electronico</label>
+                        <input type="email" id="medit-email" class="uv-form-input" placeholder="usuario@empresa.com">
+                    </div>
+                    <div class="uv-form-group uv-full">
+                        <label for="medit-extra"><i class='bx bx-info-circle'></i> Notas</label>
+                        <textarea id="medit-extra" class="uv-form-input uv-textarea" rows="2"
+                            placeholder="Informacion adicional..."></textarea>
+                    </div>
+                </div>
+                <div class="uv-modal-msg" id="medit-msg"></div>
+            </div>
+            <div class="uv-modal-footer">
+                <button class="uv-btn uv-btn-ghost" data-close="modal-edit-overlay">Cancelar</button>
+                <button class="uv-btn uv-btn-primary" id="medit-save-btn"><i class='bx bx-save'></i> Guardar
+                    Cambios</button>
+            </div>
+        </div>
+    </div>
+    <!-- MODAL ELIMINAR -->
+    <div class="uv-modal-overlay" id="modal-delete-overlay" aria-hidden="true">
+        <div class="uv-modal uv-modal-sm" role="dialog">
+            <div class="uv-modal-header">
+                <div class="uv-modal-icon uv-icon-danger"><i class='bx bx-trash'></i></div>
+                <h3>Eliminar Usuario</h3>
+                <button class="uv-modal-close" data-close="modal-delete-overlay"><i class='bx bx-x'></i></button>
+            </div>
+            <div class="uv-modal-body">
+                <p class="uv-delete-warn"><i class='bx bxs-error'></i> Se eliminara el registro de Firestore del
+                    usuario.</p>
+                <div class="uv-modal-user-badge" id="mdel-user-badge"></div>
+                <div class="uv-modal-msg" id="mdel-msg"></div>
+            </div>
+            <div class="uv-modal-footer">
+                <button class="uv-btn uv-btn-ghost" data-close="modal-delete-overlay">Cancelar</button>
+                <button class="uv-btn uv-btn-danger" id="mdel-confirm-btn"><i class='bx bx-trash'></i> Si,
+                    Eliminar</button>
+            </div>
+        </div>
+    </div>
+    <!-- MODAL PASSWORD -->
+    <div class="uv-modal-overlay" id="modal-pwd-overlay" aria-hidden="true">
+        <div class="uv-modal" role="dialog">
+            <div class="uv-modal-header">
+                <div class="uv-modal-icon uv-icon-pwd"><i class='bx bx-key'></i></div>
+                <h3>Cambiar Contrasena</h3>
+                <button class="uv-modal-close" data-close="modal-pwd-overlay"><i class='bx bx-x'></i></button>
+            </div>
+            <div class="uv-modal-body">
+                <div class="uv-modal-user-badge" id="mpwd-user-badge"></div>
+                <div class="uv-form-grid">
+                    <div class="uv-form-group uv-full">
+                        <label for="mpwd-new"><i class='bx bx-lock'></i> Nueva Contrasena</label>
+                        <div class="uv-pwd-input-wrap">
+                            <input type="password" id="mpwd-new" class="uv-form-input" placeholder="Min. 6 caracteres"
+                                autocomplete="new-password">
+                            <button type="button" class="uv-pwd-toggle" data-target="mpwd-new"><i
+                                    class='bx bx-show'></i></button>
+                        </div>
+                        <div class="uv-pwd-strength" id="mpwd-strength-bar"></div>
+                    </div>
+                    <div class="uv-form-group uv-full">
+                        <label for="mpwd-confirm"><i class='bx bx-lock-open'></i> Repetir Nueva Contrasena</label>
+                        <div class="uv-pwd-input-wrap">
+                            <input type="password" id="mpwd-confirm" class="uv-form-input"
+                                placeholder="Repite la contrasena" autocomplete="new-password">
+                            <button type="button" class="uv-pwd-toggle" data-target="mpwd-confirm"><i
+                                    class='bx bx-show'></i></button>
+                        </div>
+                        <div class="uv-pwd-match-hint" id="mpwd-match-hint"></div>
+                    </div>
+                </div>
+                <div class="uv-modal-msg" id="mpwd-msg"></div>
+            </div>
+            <div class="uv-modal-footer">
+                <button class="uv-btn uv-btn-ghost" data-close="modal-pwd-overlay">Cancelar</button>
+                <button class="uv-btn uv-btn-warning" id="mpwd-send-btn"><i class='bx bx-key'></i> Cambiar
+                    Contrasena</button>
+            </div>
+        </div>
+    </div>
+</body>
+
+<!-- ═══════════ WARP ARRIVAL OVERLAY  (menu.html landing) ═══════════ -->
+<style>
+    #wa-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 88888;
+        background: #020817;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        opacity: 1;
+        transition: opacity .85s ease;
+        pointer-events: all;
+    }
+
+    #wa-overlay.wa-done {
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    #wa-logo-wrap {
+        position: relative;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        /* arrives from the LEFT, decelerates to center */
+        animation: wa-land 1.6s cubic-bezier(.15, .85, .35, 1) forwards;
+    }
+
+    @keyframes wa-land {
+        0% {
+            transform: translateX(-160vw) scale(.05);
+            opacity: 0;
+            filter: brightness(8) blur(14px);
+        }
+
+        30% {
+            transform: translateX(-30vw) scale(.7);
+            opacity: 1;
+            filter: brightness(2) blur(3px);
+        }
+
+        70% {
+            transform: translateX(0) scale(1.06);
+            opacity: 1;
+            filter: brightness(1.3) blur(0px);
+        }
+
+        85% {
+            transform: translateX(0) scale(.98);
+            opacity: 1;
+            filter: brightness(1) blur(0px);
+        }
+
+        100% {
+            transform: translateX(0) scale(1);
+            opacity: 1;
+            filter: brightness(1) blur(0px);
+        }
+    }
+
+    /* rings spin fast then slow down (animation-timing handles natural easing) */
+    #wa-rings {
+        position: absolute;
+        inset: -60px;
+        animation: wa-spin-fast 0.18s linear infinite;
+    }
+
+    @keyframes wa-spin-fast {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    #wa-glow {
+        position: absolute;
+        width: 200px;
+        height: 200px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(0, 212, 255, .4) 0%, transparent 70%);
+        animation: wa-glow-pulse .22s ease-in-out infinite alternate;
+    }
+
+    @keyframes wa-glow-pulse {
+        from {
+            transform: scale(.9);
+            opacity: .7;
+        }
+
+        to {
+            transform: scale(1.25);
+            opacity: 1;
+        }
+    }
+</style>
+
+<div id="wa-overlay">
+    <canvas id="wa-canvas"></canvas>
+    <div id="wa-glow"></div>
+    <div id="wa-logo-wrap">
+        <svg id="wa-rings" viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="120" cy="120" r="108" fill="none" stroke="rgba(0,212,255,.55)" stroke-width="1.5"
+                stroke-dasharray="22 12" />
+            <circle cx="120" cy="120" r="86" fill="none" stroke="rgba(0,255,136,.4)" stroke-width="1"
+                stroke-dasharray="40 20" />
+            <circle cx="120" cy="120" r="64" fill="none" stroke="rgba(255,0,255,.35)" stroke-width="1.2"
+                stroke-dasharray="10 18" />
+            <circle cx="120" cy="120" r="108" fill="none" stroke="url(#wag)" stroke-width="4" stroke-dasharray="60 620"
+                stroke-linecap="round" />
+            <defs>
+                <linearGradient id="wag" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stop-color="#00d4ff" stop-opacity="0" />
+                    <stop offset="50%" stop-color="#00d4ff" stop-opacity="1" />
+                    <stop offset="100%" stop-color="#00d4ff" stop-opacity="0" />
+                </linearGradient>
+            </defs>
+        </svg>
+        <img src="./imagenes/logo.png" style="
+                width:120px;height:120px;object-fit:contain;
+                position:relative;z-index:2;
+                filter:drop-shadow(0 0 24px #00d4ff) drop-shadow(0 0 60px rgba(0,212,255,.6));
+            " />
+    </div>
+</div>
+
+<script>
+    (function () {
+        const ov = document.getElementById('wa-overlay');
+        const cv = document.getElementById('wa-canvas');
+        const ctx = cv.getContext('2d');
+
+        cv.width = window.innerWidth;
+        cv.height = window.innerHeight;
+        const W = cv.width, H = cv.height;
+        const CX = W / 2, CY = H / 2;
+
+        const COLORS = ['#00d4ff', '#00ff88', '#ffffff', '#ff00ff', '#ffe066'];
+        const NUM = 200;
+
+        function mkLine() {
+            return {
+                angle: Math.random() * Math.PI * 2,
+                dist: Math.random() * 500 + 80,   // start FAR out
+                speed: Math.random() * 28 + 10,
+                len: Math.random() * 200 + 50,
+                color: COLORS[Math.floor(Math.random() * COLORS.length)],
+                alpha: Math.random() * 0.7 + 0.3,
+                thick: Math.random() * 1.5 + 0.3,
+            };
+        }
+
+        // Lines arrive from outside and converge inward
+        const lines = Array.from({ length: NUM }, mkLine);
+
+        const TOTAL = 1750;   // match CSS landing animation + buffer
+        let t0 = null;
+
+        function draw(ts) {
+            if (!t0) t0 = ts;
+            const prog = Math.min((ts - t0) / TOTAL, 1);
+
+            // speed: fast at start (arriving), decelerates
+            const sm = (1 - prog) * (1 - prog) * 9 + 0.3;
+
+            ctx.clearRect(0, 0, W, H);
+
+            lines.forEach(l => {
+                // Move INWARD (shrink dist toward center)
+                l.dist -= l.speed * sm * 0.22;
+
+                if (l.dist < 5) {
+                    Object.assign(l, mkLine());
+                    l.dist = Math.random() * 500 + 200;
+                }
+
+                const x1 = CX + Math.cos(l.angle) * l.dist;
+                const y1 = CY + Math.sin(l.angle) * l.dist;
+                const tl = l.len * (0.5 + (1 - prog) * 2.5);
+                const x0 = CX + Math.cos(l.angle) * (l.dist + tl);
+                const y0 = CY + Math.sin(l.angle) * (l.dist + tl);
+
+                // Gradient: bright near inner end (tip), transparent outer
+                const g = ctx.createLinearGradient(x0, y0, x1, y1);
+                g.addColorStop(0, 'transparent');
+                g.addColorStop(1, l.color);
+
+                ctx.beginPath();
+                ctx.moveTo(x0, y0);
+                ctx.lineTo(x1, y1);
+                ctx.strokeStyle = g;
+                ctx.globalAlpha = l.alpha * Math.min((1 - prog) * 4, 1);
+                ctx.lineWidth = l.thick * (1 + (1 - prog) * 1.5);
+                ctx.stroke();
+            });
+
+            ctx.globalAlpha = 1;
+
+            // central flare at the start
+            if (prog < 0.4) {
+                const fa = (0.4 - prog) / 0.4;
+                const g2 = ctx.createRadialGradient(CX, CY, 0, CX, CY, 280 * fa);
+                g2.addColorStop(0, `rgba(0,212,255,${0.3 * fa})`);
+                g2.addColorStop(0.5, `rgba(0,212,255,${0.1 * fa})`);
+                g2.addColorStop(1, 'transparent');
+                ctx.fillStyle = g2;
+                ctx.fillRect(0, 0, W, H);
+            }
+
+            if (prog < 1) {
+                requestAnimationFrame(draw);
+            } else {
+                // Fade out overlay → reveal dashboard
+                ov.classList.add('wa-done');
+                setTimeout(() => ov.remove(), 900);
+            }
+        }
+
+        requestAnimationFrame(draw);
+    })();
+</script>
+
+</html>
