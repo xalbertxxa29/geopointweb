@@ -600,7 +600,30 @@ body {
 
 .btn-primary:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 24px rgba(0, 212, 255, 0.45);
+    box-shadow: 0 4px 20px rgba(0, 212, 255, 0.4);
+    filter: brightness(1.1);
+}
+
+.btn-ghost {
+    background: transparent;
+    border: 1px solid var(--glass-border);
+    padding: 10px 22px;
+    border-radius: 8px;
+    color: var(--text-dim);
+    font-weight: 600;
+    font-size: .85rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.25s;
+    height: 40px;
+}
+
+.btn-ghost:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text);
+    border-color: rgba(255, 255, 255, 0.3);
 }
 
 .btn-primary i {

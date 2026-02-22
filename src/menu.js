@@ -40,6 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const filterUnit = document.getElementById('filter-unit');
     const filterUser = document.getElementById('filter-user'); // New User Filter
     const applyBtn = document.getElementById('apply-filters');
+    const clearBtn = document.getElementById('clear-filters');
 
     // View References
     const dashboardView = document.getElementById('indicators-grid');
@@ -260,6 +261,25 @@ document.addEventListener('DOMContentLoaded', () => {
     applyBtn.addEventListener('click', () => {
         showLoader('Aplicando filtros...');
         setTimeout(() => { refreshDashboard(); hideLoader(400); }, 100);
+    });
+
+    clearBtn.addEventListener('click', () => {
+        showLoader('Limpiando filtros...');
+
+        // Reset all inputs
+        dateStart.value = '';
+        dateEnd.value = '';
+        filterClient.value = '';
+        filterUnit.value = '';
+        filterUser.value = '';
+
+        // Re-populate units to show all (resetting cascade)
+        populateUnits('');
+
+        setTimeout(() => {
+            refreshDashboard();
+            hideLoader(400);
+        }, 100);
     });
 
     function populateFilters() {
@@ -973,28 +993,26 @@ document.addEventListener('DOMContentLoaded', () => {
                         padding: 2,
                         clamp: true,
                     }
+                }
+            },
+            plugins: [{
+                id: 'centerText',
+                beforeDraw: (chart) => {
+                    const { width, height, ctx } = chart;
+                    ctx.save();
+                    ctx.font = `600 1.5rem ${FONT}`;
+                    ctx.fillStyle = '#00d4ff';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    const text = totalUsers.toString();
+                    ctx.fillText(text, width / 2, height / 2 - 8);
 
-                },
-                // Custom plugin for middle text
-                plugins: [{
-                    id: 'centerText',
-                    beforeDraw: (chart) => {
-                        const { width, height, ctx } = chart;
-                        ctx.save();
-                        ctx.font = `600 1.5rem ${FONT}`;
-                        ctx.fillStyle = '#00d4ff';
-                        ctx.textAlign = 'center';
-                        ctx.textBaseline = 'middle';
-                        const total = ctx.measureText(totalUsers).width;
-                        ctx.fillText(totalUsers, width / 2, height / 2 - 8);
-
-                        ctx.font = `400 0.7rem ${FONT_SM}`;
-                        ctx.fillStyle = '#8ab4cc';
-                        ctx.fillText('TOTAL', width / 2, height / 2 + 15);
-                        ctx.restore();
-                    }
-                }]
-            }
+                    ctx.font = `400 0.7rem ${FONT_SM}`;
+                    ctx.fillStyle = '#8ab4cc';
+                    ctx.fillText('TOTAL', width / 2, height / 2 + 15);
+                    ctx.restore();
+                }
+            }]
         });
     }
 });
@@ -2382,6 +2400,7 @@ const NEON_MAP_STYLE = {
         const emptyState = document.getElementById('av-empty');
         const statusText = document.getElementById('av-status-text');
         const applyBtn = document.getElementById('av-apply-filters');
+        const clearBtn = document.getElementById('av-clear-filters');
         const refreshBtn = document.getElementById('av-refresh-btn');
         const dateStart = document.getElementById('av-date-start');
         const dateEnd = document.getElementById('av-date-end');
@@ -2461,6 +2480,12 @@ const NEON_MAP_STYLE = {
         }
 
         applyBtn.addEventListener('click', applyFilters);
+        clearBtn.addEventListener('click', () => {
+            dateStart.value = '';
+            dateEnd.value = '';
+            userFilter.value = '';
+            applyFilters();
+        });
         refreshBtn.addEventListener('click', loadLogs);
     });
 })();
