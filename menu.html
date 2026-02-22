@@ -54,6 +54,12 @@
                     </li>
                     <li class="nav-item">
                         <a href="#" class="nav-link">
+                            <i class='bx bx-history'></i>
+                            <span class="link-text">Auditoría</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
                             <i class='bx bxs-cog'></i>
                             <span class="link-text">Configuración</span>
                         </a>
@@ -224,22 +230,184 @@
                             <div class="unit-selectors">
                                 <div class="unit-select-group">
                                     <label><i class='bx bxs-business'></i> CLIENTE</label>
-                                    <div class="unit-select-wrapper">
-                                        <select id="unit-filter-client" class="unit-modern-select">
-                                            <option value="">-- Seleccionar Cliente --</option>
-                                        </select>
-                                        <i class='bx bx-chevron-down unit-sel-arrow'></i>
+                                    <div class="uv-predictive-trigger" id="unit-client-trigger">
+                                        <span class="trigger-text">-- Seleccionar Cliente --</span>
+                                        <i class='bx bx-search'></i>
                                     </div>
                                 </div>
                                 <div class="unit-select-group" id="unit-sel-unit-group"
                                     style="opacity:.4;pointer-events:none;">
                                     <label><i class='bx bxs-buildings'></i> UNIDAD</label>
-                                    <div class="unit-select-wrapper">
-                                        <select id="unit-filter-unit" class="unit-modern-select">
-                                            <option value="">-- Seleccionar Unidad --</option>
-                                        </select>
-                                        <i class='bx bx-chevron-down unit-sel-arrow'></i>
+                                    <div class="uv-predictive-trigger" id="unit-unit-trigger">
+                                        <span class="trigger-text">-- Seleccionar Unidad --</span>
+                                        <i class='bx bx-search'></i>
                                     </div>
+                                </div>
+                            </div>
+
+                            <div class="unit-panel-actions">
+                                <button class="uv-btn uv-btn-primary" id="unit-btn-add-client">
+                                    <i class='bx bx-plus-circle'></i> Agregar Cliente
+                                </button>
+                                <button class="uv-btn uv-btn-ghost" id="unit-btn-add-unit">
+                                    <i class='bx bx-plus'></i> Agregar Unidad
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- MODAL AGREGAR CLIENTE -->
+                        <div class="uv-modal-overlay" id="modal-unit-add-client" aria-hidden="true">
+                            <div class="uv-modal uv-modal-lg" role="dialog">
+                                <div class="uv-modal-header">
+                                    <div class="uv-modal-icon uv-icon-primary"><i class='bx bx-building-house'></i>
+                                    </div>
+                                    <h3>Nuevo Cliente y Unidad</h3>
+                                    <button class="uv-modal-close" data-close="modal-unit-add-client"><i
+                                            class='bx bx-x'></i></button>
+                                </div>
+                                <div class="uv-modal-body">
+                                    <div class="uv-form-split">
+                                        <div class="uv-form-col">
+                                            <div class="uv-section-title">Información de Cliente</div>
+                                            <div class="uv-form-group">
+                                                <label for="muc-client-name"><i class='bx bxs-business'></i> Nombre
+                                                    Empresa / Cliente</label>
+                                                <input type="text" id="muc-client-name" class="uv-form-input"
+                                                    placeholder="Nombre del Cliente">
+                                            </div>
+
+                                            <div class="uv-section-title" style="margin-top: 1.5rem;">Detalles de
+                                                Primera Unidad</div>
+                                            <div class="uv-form-group">
+                                                <label for="muc-unit-name"><i class='bx bxs-buildings'></i> Nombre
+                                                    Unidad</label>
+                                                <input type="text" id="muc-unit-name" class="uv-form-input"
+                                                    placeholder="Nombre de la Unidad">
+                                            </div>
+                                            <div class="uv-form-group">
+                                                <label for="muc-unit-group"><i class='bx bxs-group'></i> Grupo</label>
+                                                <input type="text" id="muc-unit-group" class="uv-form-input"
+                                                    placeholder="Grupo de la Unidad">
+                                            </div>
+                                            <div class="uv-form-row">
+                                                <div class="uv-form-group">
+                                                    <label for="muc-unit-lat"><i class='bx bx-map-pin'></i>
+                                                        Latitud</label>
+                                                    <input type="text" id="muc-unit-lat" class="uv-form-input"
+                                                        placeholder="-12.000">
+                                                </div>
+                                                <div class="uv-form-group">
+                                                    <label for="muc-unit-lng"><i class='bx bx-map-pin'></i>
+                                                        Longitud</label>
+                                                    <input type="text" id="muc-unit-lng" class="uv-form-input"
+                                                        placeholder="-77.000">
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="uv-form-col">
+                                            <div class="uv-section-title">Geolocalización</div>
+                                            <div class="uv-mini-map-container">
+                                                <div id="muc-map" class="uv-mini-map"></div>
+                                                <div class="uv-map-hint"><i class='bx bx-info-circle'></i> Arrastra el
+                                                    marcador o ingresa coordenadas</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="uv-modal-msg" id="muc-msg"></div>
+                                </div>
+                                <div class="uv-modal-footer">
+                                    <button class="uv-btn uv-btn-ghost"
+                                        data-close="modal-unit-add-client">Cancelar</button>
+                                    <button class="uv-btn uv-btn-primary" id="muc-save-btn"><i class='bx bx-save'></i>
+                                        Guardar Cliente</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- MODAL AGREGAR UNIDAD -->
+                        <div class="uv-modal-overlay" id="modal-unit-add-unit" aria-hidden="true">
+                            <div class="uv-modal uv-modal-lg" role="dialog">
+                                <div class="uv-modal-header">
+                                    <div class="uv-modal-icon uv-icon-primary"><i class='bx bxs-buildings'></i></div>
+                                    <h3>Nueva Unidad</h3>
+                                    <button class="uv-modal-close" data-close="modal-unit-add-unit"><i
+                                            class='bx bx-x'></i></button>
+                                </div>
+                                <div class="uv-modal-body">
+                                    <div class="uv-form-split">
+                                        <div class="uv-form-col">
+                                            <div class="uv-section-title">Asignar a Cliente</div>
+                                            <div class="uv-form-group">
+                                                <label><i class='bx bxs-business'></i> Seleccionar Cliente
+                                                    Destino</label>
+                                                <div class="uv-predictive-trigger" id="muu-client-trigger"
+                                                    style="background: rgba(255,255,255,0.05);">
+                                                    <span class="trigger-text">-- Elegir Cliente --</span>
+                                                    <i class='bx bx-search'></i>
+                                                </div>
+                                            </div>
+
+                                            <div class="uv-section-title" style="margin-top: 1.5rem;">Detalles de Unidad
+                                            </div>
+                                            <div class="uv-form-group">
+                                                <label for="muu-unit-name"><i class='bx bxs-buildings'></i> Nombre
+                                                    Unidad</label>
+                                                <input type="text" id="muu-unit-name" class="uv-form-input"
+                                                    placeholder="Nombre de la Unidad">
+                                            </div>
+                                            <div class="uv-form-group">
+                                                <label for="muu-unit-group"><i class='bx bxs-group'></i> Grupo</label>
+                                                <input type="text" id="muu-unit-group" class="uv-form-input"
+                                                    placeholder="Grupo de la Unidad">
+                                            </div>
+                                            <div class="uv-form-row">
+                                                <div class="uv-form-group">
+                                                    <label for="muu-unit-lat"><i class='bx bx-map-pin'></i>
+                                                        Latitud</label>
+                                                    <input type="text" id="muu-unit-lat" class="uv-form-input"
+                                                        placeholder="-12.000">
+                                                </div>
+                                                <div class="uv-form-group">
+                                                    <label for="muu-unit-lng"><i class='bx bx-map-pin'></i>
+                                                        Longitud</label>
+                                                    <input type="text" id="muu-unit-lng" class="uv-form-input"
+                                                        placeholder="-77.000">
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="uv-form-col">
+                                            <div class="uv-section-title">Geolocalización</div>
+                                            <div class="uv-mini-map-container">
+                                                <div id="muu-map" class="uv-mini-map"></div>
+                                                <div class="uv-map-hint"><i class='bx bx-info-circle'></i> Arrastra el
+                                                    marcador para ajustar</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="uv-modal-msg" id="muu-msg"></div>
+                                </div>
+                                <div class="uv-modal-footer">
+                                    <button class="uv-btn uv-btn-ghost"
+                                        data-close="modal-unit-add-unit">Cancelar</button>
+                                    <button class="uv-btn uv-btn-primary" id="muu-save-btn"><i class='bx bx-save'></i>
+                                        Guardar Unidad</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Predictive Search Modal (Shared) -->
+                        <div class="uv-predictive-modal" id="unit-search-modal" aria-hidden="true">
+                            <div class="uv-predictive-content">
+                                <div class="uv-search-header">
+                                    <h4 id="search-modal-title"><i class='bx bx-search'></i> Buscar...</h4>
+                                    <div class="uv-search-input-wrapper">
+                                        <i class='bx bx-search'></i>
+                                        <input type="text" id="unit-search-input" class="uv-search-input"
+                                            placeholder="Escribe para buscar...">
+                                    </div>
+                                </div>
+                                <div class="uv-search-results" id="unit-search-results">
+                                    <!-- Results will appear here -->
                                 </div>
                             </div>
                         </div>
@@ -370,6 +538,9 @@
                                 </select>
                             </div>
                         </div>
+                        <button id="uv-add-user-btn" class="uv-btn uv-btn-primary uv-add-btn">
+                            <i class='bx bx-user-plus'></i> Agregar Usuario
+                        </button>
 
                         <!-- Status bar -->
                         <div class="uv-status-bar" id="uv-status-bar">
@@ -400,6 +571,79 @@
                         </div>
 
                     </div><!-- /usuarios-view -->
+
+                    <!-- ═══════ AUDITORIA VIEW ═══════ -->
+                    <div id="audit-view" class="uv-root" style="display:none;" aria-label="Auditoría de Sistema">
+                        <div class="uv-header">
+                            <div class="uv-header-left">
+                                <div class="uv-icon-wrap"><i class='bx bx-history'></i></div>
+                                <div>
+                                    <h2 class="uv-title">Auditoría de Sistema</h2>
+                                    <p class="uv-subtitle">Registro cronológico de acciones y cambios</p>
+                                </div>
+                            </div>
+                            <div class="uv-header-right">
+                                <button class="uv-refresh-btn" id="av-refresh-btn" title="Recargar">
+                                    <i class='bx bx-refresh'></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Search + filter bar -->
+                        <div class="uv-toolbar">
+                            <div class="av-filter-row"
+                                style="display:flex; gap:1rem; align-items:flex-end; flex-wrap:wrap; width:100%;">
+                                <div class="filter-group" style="display:flex; flex-direction:column; gap:0.4rem;">
+                                    <label
+                                        style="font-size:0.75rem; color:rgba(255,255,255,0.6); text-transform:uppercase;">Desde</label>
+                                    <input type="date" id="av-date-start" class="uv-select" style="min-width:140px">
+                                </div>
+                                <div class="filter-group" style="display:flex; flex-direction:column; gap:0.4rem;">
+                                    <label
+                                        style="font-size:0.75rem; color:rgba(255,255,255,0.6); text-transform:uppercase;">Hasta</label>
+                                    <input type="date" id="av-date-end" class="uv-select" style="min-width:140px">
+                                </div>
+                                <div class="filter-group" style="display:flex; flex-direction:column; gap:0.4rem;">
+                                    <label
+                                        style="font-size:0.75rem; color:rgba(255,255,255,0.6); text-transform:uppercase;">Usuario</label>
+                                    <input type="text" id="av-user-filter" class="uv-search-input"
+                                        placeholder="Correo usuario..." style="width:220px; margin:0">
+                                </div>
+                                <button id="av-apply-filters" class="uv-btn uv-btn-primary" style="height:38px;">
+                                    <i class='bx bx-filter'></i> Filtrar
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Status bar -->
+                        <div class="uv-status-bar" id="av-status-bar">
+                            <span class="uv-status-dot"></span>
+                            <span id="av-status-text">Cargando registros…</span>
+                        </div>
+
+                        <!-- Logs table -->
+                        <div class="uv-table-wrap">
+                            <table class="uv-table" id="av-table">
+                                <thead>
+                                    <tr>
+                                        <th><i class='bx bx-time'></i> Fecha y Hora</th>
+                                        <th><i class='bx bx-user'></i> Usuario</th>
+                                        <th><i class='bx bx-bolt-circle'></i> Acción</th>
+                                        <th><i class='bx bx-folder'></i> Colección</th>
+                                        <th><i class='bx bx-hash'></i> Documento</th>
+                                        <th><i class='bx bx-info-circle'></i> Detalles</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="av-tbody">
+                                    <!-- Dynamically filled -->
+                                </tbody>
+                            </table>
+                            <div class="uv-empty" id="av-empty" style="display:none;">
+                                <i class='bx bx-history'></i>
+                                <p>No se encontraron registros de auditoría</p>
+                            </div>
+                        </div>
+                    </div><!-- /audit-view -->
 
 
                     <div class="glass-panel table-section" id="table-section" style="display: none;">
@@ -484,6 +728,52 @@
             </div>
         </div>
     </div>
+
+    <!-- MODAL AGREGAR USUARIO -->
+    <div class="uv-modal-overlay" id="modal-add-overlay" aria-hidden="true">
+        <div class="uv-modal" role="dialog">
+            <div class="uv-modal-header">
+                <div class="uv-modal-icon uv-icon-primary"><i class='bx bx-user-plus'></i></div>
+                <h3>Nuevo Usuario</h3>
+                <button class="uv-modal-close" data-close="modal-add-overlay"><i class='bx bx-x'></i></button>
+            </div>
+            <div class="uv-modal-body">
+                <div class="uv-form-grid">
+                    <div class="uv-form-group">
+                        <label for="madd-username"><i class='bx bx-at'></i> Usuario (ID)</label>
+                        <input type="text" id="madd-username" class="uv-form-input" placeholder="ej: jsolis"
+                            autocomplete="off">
+                    </div>
+                    <div class="uv-form-group">
+                        <label for="madd-tipo"><i class='bx bx-shield'></i> Tipo / Rol</label>
+                        <select id="madd-tipo" class="uv-form-select">
+                            <!-- Dynamic options -->
+                        </select>
+                    </div>
+                    <div class="uv-form-group uv-full">
+                        <label for="madd-nombres"><i class='bx bx-user'></i> Nombre Completo</label>
+                        <input type="text" id="madd-nombres" class="uv-form-input" placeholder="Nombre y Apellido">
+                    </div>
+                    <div class="uv-form-group uv-full">
+                        <label for="madd-email"><i class='bx bx-envelope'></i> Correo Electrónico</label>
+                        <input type="email" id="madd-email" class="uv-form-input" placeholder="jsolis@liderman.com.pe"
+                            readonly tabindex="-1">
+                    </div>
+                    <div class="uv-form-group uv-full">
+                        <label for="madd-password"><i class='bx bx-key'></i> Contraseña Inicial</label>
+                        <input type="password" id="madd-password" class="uv-form-input"
+                            placeholder="Mínimo 8 caracteres">
+                    </div>
+                </div>
+                <div class="uv-modal-msg" id="madd-msg"></div>
+            </div>
+            <div class="uv-modal-footer">
+                <button class="uv-btn uv-btn-ghost" data-close="modal-add-overlay">Cancelar</button>
+                <button class="uv-btn uv-btn-primary" id="madd-save-btn"><i class='bx bx-user-plus'></i> Crear
+                    Usuario</button>
+            </div>
+        </div>
+    </div>
     <!-- MODAL ELIMINAR -->
     <div class="uv-modal-overlay" id="modal-delete-overlay" aria-hidden="true">
         <div class="uv-modal uv-modal-sm" role="dialog">
@@ -543,6 +833,47 @@
                 <button class="uv-btn uv-btn-ghost" data-close="modal-pwd-overlay">Cancelar</button>
                 <button class="uv-btn uv-btn-warning" id="mpwd-send-btn"><i class='bx bx-key'></i> Cambiar
                     Contrasena</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL ÉXITO (CREDENTIALS) -->
+    <div class="uv-modal-overlay" id="modal-success-overlay" aria-hidden="true">
+        <div class="uv-modal" role="dialog">
+            <div class="uv-modal-header">
+                <div class="uv-modal-icon uv-icon-primary"><i class='bx bx-check-shield'></i></div>
+                <h3>Usuario Creado Exitosamente</h3>
+                <button class="uv-modal-close" data-close="modal-success-overlay"><i class='bx bx-x'></i></button>
+            </div>
+            <div class="uv-modal-body">
+                <p style="margin-bottom:1.5rem; color:rgba(255,255,255,0.7)">Las credenciales han sido generadas. Por
+                    favor cópialas antes de cerrar.</p>
+                <div class="uv-form-grid">
+                    <div class="uv-form-group uv-full">
+                        <label>Correo Electrónico</label>
+                        <div class="uv-copy-wrap">
+                            <input type="text" id="msucc-email" class="uv-form-input" readonly>
+                            <button class="uv-copy-btn" data-target="msucc-email"><i class='bx bx-copy'></i></button>
+                        </div>
+                    </div>
+                    <div class="uv-form-group uv-full">
+                        <label>Contraseña</label>
+                        <div class="uv-copy-wrap">
+                            <input type="text" id="msucc-password" class="uv-form-input" readonly>
+                            <button class="uv-copy-btn" data-target="msucc-password"><i class='bx bx-copy'></i></button>
+                        </div>
+                    </div>
+                    <div class="uv-form-group uv-full" style="margin-top: 1rem;">
+                        <button class="uv-btn uv-btn-ghost" id="msucc-copy-all"
+                            style="width:100%; border-color: var(--primary-color);">
+                            <i class='bx bx-copy-alt'></i> Copiar Todo (Correo y Clave)
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="uv-modal-footer">
+                <button class="uv-btn uv-btn-primary" data-close="modal-success-overlay" style="width:100%">Listo,
+                    Cerrar</button>
             </div>
         </div>
     </div>

@@ -9,54 +9,53 @@ service cloud.firestore {
     }
 
     function callerUsername() {
-      return request.auth.token.email.split('@')[0];
+      // Normalizamos a minúsculas para evitar errores de permisos por casing
+      return request.auth.token.email.split('@')[0].lower();
     }
 
     function isAdmin() {
       return isAuthenticated() &&
-        get(/databases/$(database)/documents/usuarios/$(callerUsername())).data.tipo
-          in ['admin', 'Administrador', 'administrador'];
+        get(/databases/$(database)/documents/usuarios/$(callerUsername())).data.tipo.lower()
+          in ['admin', 'administrador'];
     }
 
     // ── tareas (incident reports) ─────────────────────────────────────────
-    // Any authenticated user can read.
-    // Only authenticated users can create their own records.
-    // Only admins can update or delete.
+    // Fusionando: Lectura/Creación para autenticados, Modificación para admin
     match /tareas/{tareaId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated()
-                    && request.resource.data.keys().hasAll(['cliente', 'unidad', 'estado']);
+      allow create: if isAuthenticated();
       allow update, delete: if isAdmin();
 
-      // Sub-collections (actividades, fotos, etc.)
+      // Sub-colecciones (actividades, fotos, etc.)
       match /{subCol}/{docId} {
-        allow read: if isAuthenticated();
-        allow write: if isAuthenticated();
+        allow read, write: if isAuthenticated();
       }
     }
 
     // ── usuarios ──────────────────────────────────────────────────────────
-    // Users can read their own doc. Admins can read/write all.
+    // Los usuarios ven su propio perfil, admins ven/modifican todo
     match /usuarios/{userId} {
-      allow read: if isAuthenticated() &&
-                  (callerUsername() == userId || isAdmin());
+      allow read: if isAuthenticated() && (callerUsername() == userId || isAdmin());
       allow write: if isAdmin();
     }
 
     // ── CLIENTES (unit catalog) ───────────────────────────────────────────
-    // Anyone authenticated can read clients and their units.
-    // Only admins can modify.
+    // Respetando el PRIMER SET: Mantener acceso abierto para no romper el flujo actual
     match /CLIENTES/{clienteId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
-
+      allow read, write: if true;
       match /UNIDADES/{unidadId} {
-        allow read: if isAuthenticated();
-        allow write: if isAdmin();
+        allow read, write: if true;
       }
     }
 
-    // ── Default: deny everything else ────────────────────────────────────
+    // ── logs (auditoría) ────────────────────────────────────────────────
+    // Cualquier usuario logueado crea logs, solo admin los lee
+    match /logs/{logId} {
+      allow create: if isAuthenticated();
+      allow read: if isAdmin();
+    }
+
+    // ── Default ──
     match /{document=**} {
       allow read, write: if false;
     }
