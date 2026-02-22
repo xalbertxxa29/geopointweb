@@ -32,3 +32,7 @@ Futuristic web application with Firebase integration.
 -   `menu.html`: Dashboard page.
 -   `src/`: Source files (JS, CSS, Firebase config).
 -   `imagenes/`: Assets (logo).
+
+---
+*Ultima actualización para disparo de despliegue: 2026-02-22*
+
