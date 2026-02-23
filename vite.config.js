@@ -17,6 +17,17 @@ export default defineConfig(({ command }) => ({
                 main: resolve(__dirname, 'index.html'),
                 menu: resolve(__dirname, 'menu.html'),
             },
+            output: {
+                manualChunks(id) {
+                    if (id.includes('node_modules')) {
+                        if (id.includes('firebase')) return 'vendor-firebase';
+                        if (id.includes('chart.js')) return 'vendor-charts';
+                        if (id.includes('jspdf') || id.includes('html2canvas')) return 'vendor-pdf';
+                        if (id.includes('leaflet') || id.includes('maplibre-gl')) return 'vendor-maps';
+                        return 'vendor';
+                    }
+                }
+            }
         },
     },
 }));
