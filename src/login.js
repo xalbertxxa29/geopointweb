@@ -59,7 +59,7 @@ function launchWarpAndGo(href) {
                 </linearGradient>
             </defs>
         </svg>
-        <img src="./imagenes/logo.png" style="
+        <img src="./imagenes/logo.webp" style="
             width:120px;height:120px;object-fit:contain;position:relative;z-index:2;
             filter:drop-shadow(0 0 24px #00d4ff) drop-shadow(0 0 60px rgba(0,212,255,.6));
         "/>
