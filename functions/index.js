@@ -128,15 +128,15 @@ exports.getUsersList = onCall(
                     results.push({ id: doc.id, ...u });
                 }
                 // Supervisor: sees [usuario, supervisor, zonal] - explicitly excludes admin
-                else if (callerTipo === 'supervisor' || callerTipo === 'zonal') {
+                else if (callerTipo === 'supervisor') {
                     const visibleToSuper = ['usuario', 'supervisor', 'zonal'];
                     if (visibleToSuper.includes(uTipo)) {
                         results.push({ id: doc.id, ...u });
                     }
                 }
-                // Usuario: sees only [usuario]
+                // Usuario: sees [usuario, zonal]
                 else if (callerTipo === 'usuario') {
-                    if (uTipo === 'usuario') {
+                    if (uTipo === 'usuario' || uTipo === 'zonal') {
                         results.push({ id: doc.id, ...u });
                     }
                 }
@@ -193,8 +193,13 @@ exports.createSystemUser = onCall(
 
             if (isCallerAdmin) {
                 // Admin can do anything
-            } else if (isCallerSuper || isCallerUser) {
-                // Supervisor/User can only create 'usuario' or 'zonal'
+            } else if (isCallerSuper) {
+                // Supervisor can create supervisor, usuario or zonal
+                if (!['supervisor', 'usuario', 'zonal'].includes(targetTipo)) {
+                    throw new HttpsError('permission-denied', 'No tienes permiso para crear usuarios de este tipo.');
+                }
+            } else if (isCallerUser) {
+                // User can only create 'usuario' or 'zonal'
                 if (!['usuario', 'zonal'].includes(targetTipo)) {
                     throw new HttpsError('permission-denied', 'No tienes permiso para crear usuarios de este tipo.');
                 }

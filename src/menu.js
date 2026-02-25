@@ -243,7 +243,12 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (err) {
                 if (import.meta.env.DEV) console.error('[menu] Data Load Error:', err);
                 hideLoader();
-                loadingDiv.innerHTML = `<i class='bx bxs-error-circle'></i> Error al cargar datos. Recarga la página.`;
+                const isOffline = err.message?.includes('offline') || err.code === 'unavailable';
+                loadingDiv.innerHTML = `
+                    <i class='bx bxs-error-circle'></i> 
+                    ${isOffline ? 'Error de conexión (Offline). Reintenta en unos segundos.' : 'Error al cargar datos.'}
+                    <br><button onclick="window.location.reload()" class="uv-btn uv-btn-primary" style="margin-top:10px; padding: 5px 15px; font-size: 0.8rem;">Recargar Página</button>
+                `;
             }
         }
     });
@@ -1947,11 +1952,13 @@ const NEON_MAP_STYLE = {
                 const myRole = (window._currentUserRole || '').toLowerCase();
                 let options = [];
                 if (['admin', 'administrador'].includes(myRole)) {
-                    options = ['admin', 'supervisor', 'usuario', 'zonal'];
+                    options = ['admin', 'supervisor', 'zonal', 'usuario'];
                 } else if (myRole === 'supervisor') {
+                    options = ['supervisor', 'zonal', 'usuario'];
+                } else if (myRole === 'usuario') {
                     options = ['usuario', 'zonal'];
                 } else {
-                    options = ['usuario', 'zonal'];
+                    options = [];
                 }
 
                 maddTipo.innerHTML = options.map(opt =>
@@ -2022,8 +2029,10 @@ const NEON_MAP_STYLE = {
         //  Type badge 
         function typeBadge(tipo) {
             const map = {
-                admin: 'uv-badge-admin', operador: 'uv-badge-operador',
-                supervisor: 'uv-badge-supervisor', cliente: 'uv-badge-cliente',
+                admin: 'uv-badge-admin',
+                supervisor: 'uv-badge-supervisor',
+                zonal: 'uv-badge-operador',  // Reusing magenta/purple for zonal
+                usuario: 'uv-badge-cliente', // Reusing cyan/blue for usuario
             };
             const cls = map[(tipo || '').toLowerCase()] || 'uv-badge-default';
             return `<span class="uv-type-badge ${cls}">${tipo || 'N/A'}</span>`;
@@ -2184,7 +2193,23 @@ const NEON_MAP_STYLE = {
             clearModalMsg(meditMsg);
             meditBadge.innerHTML = badgeHTML(u);
             meditNombre.value = u.nombres || '';
-            meditTipo.value = u.tipo || 'operador';
+
+            // Populate edit dropdown based on role
+            const myRole = (window._currentUserRole || '').toLowerCase();
+            let options = [];
+            if (['admin', 'administrador'].includes(myRole)) {
+                options = ['admin', 'supervisor', 'zonal', 'usuario'];
+            } else if (myRole === 'supervisor') {
+                options = ['supervisor', 'zonal', 'usuario'];
+            } else if (myRole === 'usuario') {
+                options = ['zonal', 'usuario'];
+            }
+
+            meditTipo.innerHTML = options.map(opt =>
+                `<option value="${opt}">${opt.toUpperCase()}</option>`
+            ).join('');
+
+            meditTipo.value = u.tipo || 'usuario';
             meditEmail.value = u.email || '';
             meditExtra.value = u.extra || '';
             openModal(modalEdit);
