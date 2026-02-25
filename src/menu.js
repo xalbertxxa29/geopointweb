@@ -2226,20 +2226,27 @@ const NEON_MAP_STYLE = {
             meditSave.innerHTML = `<i class="bx bx-loader-alt bx-spin"></i> Guardando...`;
 
             try {
-                const ref = doc(db, 'usuarios', _editingId);
-                const updates = {
+                const functions = getFunctions(auth.app, 'us-central1');
+                const updateCall = httpsCallable(functions, 'updateSystemUser');
+
+                const updateData = {
+                    targetUid: _editingId,
                     nombres: nombres,
                     tipo: meditTipo.value,
+                    email: meditEmail.value.trim(),
+                    notas: meditExtra.value.trim()
                 };
-                if (meditEmail.value.trim()) updates.email = meditEmail.value.trim();
-                if (meditExtra.value.trim()) updates.notas = meditExtra.value.trim();
-                await updateDoc(ref, updates);
-                addAuditLog('UPDATE', 'USUARIOS', _editingId, { cambios: updates });
+
+                await updateCall(updateData);
+                addAuditLog('UPDATE', 'USUARIOS', _editingId, { cambios: updateData });
 
                 // Update local cache
                 const idx = _allUsers.findIndex(u => u.username === _editingId);
                 if (idx !== -1) {
-                    _allUsers[idx] = { ..._allUsers[idx], ...updates };
+                    _allUsers[idx].nombres = nombres;
+                    _allUsers[idx].tipo = updateData.tipo;
+                    _allUsers[idx].email = updateData.email;
+                    _allUsers[idx].extra = updateData.notas;
                 }
                 renderTable(_allUsers);
                 if (totalCount) totalCount.textContent = _allUsers.length;
@@ -2248,7 +2255,7 @@ const NEON_MAP_STYLE = {
                 setTimeout(() => closeModal(modalEdit), 1600);
 
             } catch (e) {
-                setModalMsg(meditMsg, 'Error: ' + e.message);
+                setModalMsg(meditMsg, 'Error: ' + (e.message || 'Error desconocido'));
                 console.error(e);
             } finally {
                 meditSave.disabled = false;
