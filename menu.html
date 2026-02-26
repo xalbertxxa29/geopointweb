@@ -542,9 +542,15 @@
                                 </select>
                             </div>
                         </div>
-                        <button id="uv-add-user-btn" class="uv-btn uv-btn-primary uv-add-btn">
-                            <i class='bx bx-user-plus'></i> Agregar Usuario
-                        </button>
+                        <div class="uv-action-bar">
+                            <button id="uv-add-user-btn" class="uv-btn uv-btn-primary uv-add-btn">
+                                <i class='bx bx-user-plus'></i> Agregar Usuario
+                            </button>
+                            <button id="uv-bulk-delete-btn" class="uv-btn uv-btn-danger uv-bulk-del-btn"
+                                style="display:none;">
+                                <i class='bx bx-trash'></i> Eliminar <span id="uv-sel-count">0</span>
+                            </button>
+                        </div>
 
                         <!-- Status bar -->
                         <div class="uv-status-bar" id="uv-status-bar">
@@ -557,6 +563,9 @@
                             <table class="uv-table" id="uv-table">
                                 <thead>
                                     <tr>
+                                        <th style="width: 40px;">
+                                            <input type="checkbox" id="uv-select-all" class="uv-checkbox">
+                                        </th>
                                         <th><i class='bx bxs-user'></i> Usuario</th>
                                         <th><i class='bx bx-envelope'></i> Correo</th>
                                         <th><i class='bx bx-id-card'></i> Nombre Completo</th>
@@ -719,7 +728,16 @@
                     </div>
                     <div class="uv-form-group uv-full">
                         <label for="medit-email"><i class='bx bx-envelope'></i> Correo Electronico</label>
-                        <input type="email" id="medit-email" class="uv-form-input" placeholder="usuario@empresa.com">
+                        <input type="email" id="medit-email" class="uv-form-input" placeholder="usuario@empresa.com"
+                            readonly tabindex="-1" style="opacity: 0.7; cursor: not-allowed;">
+                    </div>
+                    <div class="uv-form-group">
+                        <label for="medit-macro"><i class='bx bx-map-alt'></i> Macrozona</label>
+                        <input type="text" id="medit-macro" class="uv-form-input" placeholder="ej: Norte">
+                    </div>
+                    <div class="uv-form-group">
+                        <label for="medit-zona"><i class='bx bx-map'></i> Zona</label>
+                        <input type="text" id="medit-zona" class="uv-form-input" placeholder="ej: Sector 1">
                     </div>
                     <div class="uv-form-group uv-full">
                         <label for="medit-extra"><i class='bx bx-info-circle'></i> Notas</label>
@@ -761,6 +779,14 @@
                     <div class="uv-form-group uv-full">
                         <label for="madd-nombres"><i class='bx bx-user'></i> Nombre Completo</label>
                         <input type="text" id="madd-nombres" class="uv-form-input" placeholder="Nombre y Apellido">
+                    </div>
+                    <div class="uv-form-group">
+                        <label for="madd-macro"><i class='bx bx-map-alt'></i> Macrozona</label>
+                        <input type="text" id="madd-macro" class="uv-form-input" placeholder="ej: Norte">
+                    </div>
+                    <div class="uv-form-group">
+                        <label for="madd-zona"><i class='bx bx-map'></i> Zona</label>
+                        <input type="text" id="madd-zona" class="uv-form-input" placeholder="ej: Sector 1">
                     </div>
                     <div class="uv-form-group uv-full">
                         <label for="madd-email"><i class='bx bx-envelope'></i> Correo Electrónico</label>
@@ -817,7 +843,7 @@
                     <div class="uv-form-group uv-full">
                         <label for="mpwd-new"><i class='bx bx-lock'></i> Nueva Contrasena</label>
                         <div class="uv-pwd-input-wrap">
-                            <input type="password" id="mpwd-new" class="uv-form-input" placeholder="Min. 6 caracteres"
+                            <input type="password" id="mpwd-new" class="uv-form-input" placeholder="Min. 8 caracteres"
                                 autocomplete="new-password">
                             <button type="button" class="uv-pwd-toggle" data-target="mpwd-new"><i
                                     class='bx bx-show'></i></button>
@@ -1109,5 +1135,19 @@
         requestAnimationFrame(draw);
     })();
 </script>
+
+<!-- Custom Confirmation Modal -->
+<div class="uv-confirm-modal-overlay" id="uv-confirm-modal" aria-hidden="true">
+    <div class="uv-confirm-modal">
+        <div class="uv-confirm-icon" id="uv-confirm-icon"><i class='bx bx-help-circle'></i></div>
+        <h3 id="uv-confirm-title">Confirmar Acción</h3>
+        <p id="uv-confirm-body">¿Estás seguro de que deseas continuar?</p>
+        <div class="uv-confirm-footer">
+            <button class="uv-btn uv-btn-ghost" id="uv-confirm-cancel">Cancelar</button>
+            <button class="uv-btn uv-btn-primary" id="uv-confirm-ok">Confirmar</button>
+        </div>
+    </div>
+</div>
+</body>
 
 </html>

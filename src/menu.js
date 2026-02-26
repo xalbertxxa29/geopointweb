@@ -1862,6 +1862,8 @@ const NEON_MAP_STYLE = {
         const maddEmail = document.getElementById('madd-email');
         const maddPassword = document.getElementById('madd-password');
         const maddSaveBtn = document.getElementById('madd-save-btn');
+        const maddMacro = document.getElementById('madd-macro');
+        const maddZona = document.getElementById('madd-zona');
         const maddMsg = document.getElementById('madd-msg');
         const openAddBtn = document.getElementById('uv-add-user-btn');
 
@@ -1871,6 +1873,8 @@ const NEON_MAP_STYLE = {
         const meditTipo = document.getElementById('medit-tipo');
         const meditEmail = document.getElementById('medit-email');
         const meditExtra = document.getElementById('medit-extra');
+        const meditMacro = document.getElementById('medit-macro');
+        const meditZona = document.getElementById('medit-zona');
         const meditMsg = document.getElementById('medit-msg');
         const meditSave = document.getElementById('medit-save-btn');
 
@@ -1947,6 +1951,8 @@ const NEON_MAP_STYLE = {
                 maddNombres.value = '';
                 maddEmail.value = '';
                 maddPassword.value = '';
+                if (maddMacro) maddMacro.value = '';
+                if (maddZona) maddZona.value = '';
 
                 // Populate dropdown based on role
                 const myRole = (window._currentUserRole || '').toLowerCase();
@@ -1994,7 +2000,15 @@ const NEON_MAP_STYLE = {
                     const functions = getFunctions(auth.app, 'us-central1');
                     const createCall = httpsCallable(functions, 'createSystemUser');
 
-                    await createCall({ username, fullName, email, password, tipo });
+                    await createCall({
+                        username,
+                        fullName,
+                        email,
+                        password,
+                        tipo,
+                        macrozona: (maddMacro?.value || '').trim(),
+                        zona: (maddZona?.value || '').trim()
+                    });
                     addAuditLog('CREATE', 'USUARIOS', username, { email, tipo, fullName });
 
                     // Show credentials in success modal
@@ -2126,6 +2140,9 @@ const NEON_MAP_STYLE = {
                     : `<span style="color:rgba(255,255,255,.3);font-style:italic">No registrado</span>`;
                 return `<tr>
                     <td>
+                        <input type="checkbox" class="uv-row-checkbox" data-uid="${u.username}">
+                    </td>
+                    <td>
                         <div class="uv-user-cell">
                             <div class="uv-avatar">${initials}</div>
                             <div>
@@ -2165,6 +2182,138 @@ const NEON_MAP_STYLE = {
                     if (action === 'pwd') openPwdModal(user);
                     if (action === 'del') openDelModal(user);
                 });
+            });
+
+            // Re-bind checkboxes after render
+            bindCheckboxes();
+        }
+
+        // --- Custom Confirmation Modal Logic ---
+        const confirmModal = document.getElementById('uv-confirm-modal');
+        const confirmIcon = document.getElementById('uv-confirm-icon');
+        const confirmTitle = document.getElementById('uv-confirm-title');
+        const confirmBody = document.getElementById('uv-confirm-body');
+        const confirmCancel = document.getElementById('uv-confirm-cancel');
+        const confirmOk = document.getElementById('uv-confirm-ok');
+
+        function showConfirmModal({ title, body, iconClass = '', isAlert = false }) {
+            return new Promise((resolve) => {
+                confirmTitle.textContent = title || 'Confirmar Acción';
+                confirmBody.textContent = body || '';
+                confirmIcon.className = `uv-confirm-icon ${iconClass}`;
+                confirmIcon.innerHTML = iconClass.includes('danger') ? `<i class='bx bx-error-circle'></i>` : `<i class='bx bx-help-circle'></i>`;
+
+                if (isAlert) {
+                    confirmCancel.style.display = 'none';
+                    confirmOk.textContent = 'Aceptar';
+                } else {
+                    confirmCancel.style.display = 'block';
+                    confirmOk.textContent = 'Confirmar';
+                }
+
+                confirmModal.classList.add('open');
+
+                const cleanup = (val) => {
+                    confirmModal.classList.remove('open');
+                    confirmOk.removeEventListener('click', onOk);
+                    confirmCancel.removeEventListener('click', onCancel);
+                    resolve(val);
+                };
+
+                const onOk = () => cleanup(true);
+                const onCancel = () => cleanup(false);
+
+                confirmOk.addEventListener('click', onOk);
+                confirmCancel.addEventListener('click', onCancel);
+            });
+        }
+
+        // Selection Logic
+        let _selectedUids = new Set();
+        const selectAllIcon = document.getElementById('uv-select-all');
+        const bulkDelBtn = document.getElementById('uv-bulk-delete-btn');
+        const selCountSpan = document.getElementById('uv-sel-count');
+
+        function updateUISelection() {
+            const count = _selectedUids.size;
+            if (selCountSpan) selCountSpan.textContent = count;
+            if (bulkDelBtn) bulkDelBtn.style.display = count > 0 ? 'inline-flex' : 'none';
+            if (selectAllIcon) selectAllIcon.checked = count > 0 && count === _allUsers.length;
+        }
+
+        function bindCheckboxes() {
+            const boxes = tbody.querySelectorAll('.uv-row-checkbox');
+            boxes.forEach(box => {
+                box.checked = _selectedUids.has(box.dataset.uid);
+                box.addEventListener('change', () => {
+                    if (box.checked) _selectedUids.add(box.dataset.uid);
+                    else _selectedUids.delete(box.dataset.uid);
+                    updateUISelection();
+                });
+            });
+        }
+
+        if (selectAllIcon) {
+            selectAllIcon.addEventListener('change', () => {
+                const checked = selectAllIcon.checked;
+                const visibleCheckboxes = tbody.querySelectorAll('.uv-row-checkbox');
+                visibleCheckboxes.forEach(box => {
+                    box.checked = checked;
+                    if (checked) _selectedUids.add(box.dataset.uid);
+                    else _selectedUids.delete(box.dataset.uid);
+                });
+                updateUISelection();
+            });
+        }
+
+        if (bulkDelBtn) {
+            bulkDelBtn.addEventListener('click', async () => {
+                if (_selectedUids.size === 0) return;
+
+                const count = _selectedUids.size;
+                const confirmRes = await showConfirmModal({
+                    title: 'Eliminación Masiva',
+                    body: `¿Estás seguro de eliminar ${count} usuario(s) permanentemente? Esta acción es irreversible.`,
+                    iconClass: 'danger'
+                });
+
+                if (!confirmRes) return;
+
+                bulkDelBtn.disabled = true;
+                bulkDelBtn.innerHTML = `<i class='bx bx-loader-alt bx-spin'></i> Eliminando...`;
+
+                try {
+                    const functions = getFunctions(auth.app, 'us-central1');
+                    const bulkDeleteCall = httpsCallable(functions, 'deleteUsersBatch');
+
+                    await bulkDeleteCall({ targetUids: Array.from(_selectedUids) });
+                    addAuditLog('DELETE_BATCH', 'USUARIOS', 'BATCH', { count, uids: Array.from(_selectedUids) });
+
+                    // Remove from local cache
+                    _allUsers = _allUsers.filter(u => !_selectedUids.has(u.username));
+                    _selectedUids.clear();
+                    renderTable(_allUsers);
+                    updateUISelection();
+                    if (totalCount) totalCount.textContent = _allUsers.length;
+                    setStatus(`${_allUsers.length} usuario(s) restantes`);
+
+                    await showConfirmModal({
+                        title: 'Éxito',
+                        body: 'Eliminación masiva completada con éxito.',
+                        isAlert: true
+                    });
+                } catch (e) {
+                    console.error('[bulkDelete] Error:', e);
+                    await showConfirmModal({
+                        title: 'Error al eliminar',
+                        body: e.message || 'Ocurrió un error inesperado en el servidor.',
+                        iconClass: 'danger',
+                        isAlert: true
+                    });
+                } finally {
+                    bulkDelBtn.disabled = false;
+                    bulkDelBtn.innerHTML = `<i class='bx bx-trash'></i> Eliminar <span id="uv-sel-count">0</span>`;
+                }
             });
         }
 
@@ -2212,6 +2361,8 @@ const NEON_MAP_STYLE = {
             meditTipo.value = u.tipo || 'usuario';
             meditEmail.value = u.email || '';
             meditExtra.value = u.extra || '';
+            if (meditMacro) meditMacro.value = u.macrozona || '';
+            if (meditZona) meditZona.value = u.zona || '';
             openModal(modalEdit);
         }
 
@@ -2234,7 +2385,9 @@ const NEON_MAP_STYLE = {
                     nombres: nombres,
                     tipo: meditTipo.value,
                     email: meditEmail.value.trim(),
-                    notas: meditExtra.value.trim()
+                    notas: meditExtra.value.trim(),
+                    macrozona: (meditMacro?.value || '').trim(),
+                    zona: (meditZona?.value || '').trim()
                 };
 
                 await updateCall(updateData);
@@ -2247,6 +2400,8 @@ const NEON_MAP_STYLE = {
                     _allUsers[idx].tipo = updateData.tipo;
                     _allUsers[idx].email = updateData.email;
                     _allUsers[idx].extra = updateData.notas;
+                    _allUsers[idx].macrozona = updateData.macrozona;
+                    _allUsers[idx].zona = updateData.zona;
                 }
                 renderTable(_allUsers);
                 if (totalCount) totalCount.textContent = _allUsers.length;
@@ -2309,6 +2464,7 @@ const NEON_MAP_STYLE = {
             const hint = document.getElementById('mpwd-match-hint');
             if (pwdNew) pwdNew.value = '';
             if (pwdConfirm) pwdConfirm.value = '';
+            pwdNew.placeholder = "Min. 8 caracteres";
             if (bar) bar.removeAttribute('data-level');
             if (hint) { hint.textContent = ''; hint.className = 'uv-pwd-match-hint'; }
             openModal(modalPwd);
@@ -2317,8 +2473,8 @@ const NEON_MAP_STYLE = {
         // ── Password strength helper ───────────────────────────────
         function pwdStrength(pwd) {
             let score = 0;
-            if (pwd.length >= 6) score++;
-            if (pwd.length >= 10) score++;
+            if (pwd.length >= 8) score++;
+            if (pwd.length >= 12) score++;
             if (/[A-Z]/.test(pwd) || /[0-9]/.test(pwd)) score++;
             if (/[^A-Za-z0-9]/.test(pwd)) score++;
             return score; // 0..4
@@ -2368,8 +2524,8 @@ const NEON_MAP_STYLE = {
             const newPwd = document.getElementById('mpwd-new')?.value || '';
             const confirmPwd = document.getElementById('mpwd-confirm')?.value || '';
 
-            if (!newPwd || newPwd.length < 6) {
-                setModalMsg(mpwdMsg, 'La contraseña debe tener al menos 6 caracteres.');
+            if (!newPwd || newPwd.length < 8) {
+                setModalMsg(mpwdMsg, 'La contraseña debe tener al menos 8 caracteres.');
                 return;
             }
             if (newPwd !== confirmPwd) {

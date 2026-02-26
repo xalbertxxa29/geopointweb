@@ -3144,3 +3144,139 @@ body:has(.login-page) {
     font-style: italic;
     font-size: 0.9rem;
 }
+
+/* ═════ BULK DELETE UI ═════ */
+.uv-action-bar {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.uv-bulk-del-btn {
+    animation: uv-fade-in 0.3s ease;
+}
+
+@keyframes uv-fade-in {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.uv-checkbox,
+.uv-row-checkbox {
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border: 1px solid var(--glass-border);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.05);
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    margin: 0 auto;
+}
+
+.uv-checkbox:checked,
+.uv-row-checkbox:checked {
+    background: var(--primary-dim);
+    border-color: var(--primary);
+}
+
+.uv-checkbox:checked::after,
+.uv-row-checkbox:checked::after {
+    content: '\eb2d';
+    /* bx-check */
+    font-family: 'boxicons';
+    color: var(--primary);
+    font-size: 14px;
+}
+
+/* ═════ CUSTOM CONFIRM MODAL ═════ */
+.uv-confirm-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 20000;
+    background: rgba(2, 8, 23, 0.85);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+}
+
+.uv-confirm-modal-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.uv-confirm-modal {
+    width: 100%;
+    max-width: 400px;
+    background: var(--bg2);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    padding: 30px;
+    text-align: center;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 30px rgba(0, 212, 255, 0.1);
+    transform: translateY(20px);
+    transition: transform 0.3s;
+}
+
+.uv-confirm-modal-overlay.open .uv-confirm-modal {
+    transform: translateY(0);
+}
+
+.uv-confirm-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: var(--primary-dim);
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    margin: 0 auto 20px;
+    border: 1px solid var(--primary);
+    box-shadow: 0 0 20px var(--primary-dim);
+}
+
+.uv-confirm-icon.danger {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border-color: var(--accent);
+    box-shadow: 0 0 20px var(--accent-dim);
+}
+
+.uv-confirm-modal h3 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.1rem;
+    margin-bottom: 12px;
+    color: #fff;
+    letter-spacing: 1px;
+}
+
+.uv-confirm-modal p {
+    font-size: 0.9rem;
+    color: var(--text-dim);
+    line-height: 1.6;
+    margin-bottom: 24px;
+}
+
+.uv-confirm-footer {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}

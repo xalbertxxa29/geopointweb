@@ -31,10 +31,19 @@ exports.updateUserPassword = onCall(
         try {
             const targetUser = await getAuth().getUserByEmail(targetEmail);
             await getAuth().updateUser(targetUser.uid, { password: newPassword });
-            return { success: true };
+            return { success: true, message: 'Contraseña actualizada con éxito.' };
         } catch (err) {
-            console.error('[updateUserPassword] Error:', err);
-            throw new HttpsError('internal', 'Error al actualizar contraseña.');
+            console.error('[updateUserPassword] Failure for:', targetEmail, err);
+
+            // Return specific error messages for common Auth issues
+            if (err.code === 'auth/user-not-found') {
+                throw new HttpsError('not-found', 'El usuario no existe en el sistema de autenticación.');
+            }
+            if (err.code === 'auth/invalid-password') {
+                throw new HttpsError('invalid-argument', 'La contraseña no cumple con los requisitos de seguridad.');
+            }
+
+            throw new HttpsError('internal', 'Error al actualizar: ' + err.message);
         }
     }
 );
@@ -95,7 +104,7 @@ exports.createSystemUser = onCall(
         if (!request.auth) throw new HttpsError('unauthenticated', 'No autenticado.');
 
         const callerUsername = (request.auth.token?.email || '').split('@')[0].toLowerCase();
-        const { username, fullName, email, password, tipo } = request.data;
+        const { username, fullName, email, password, tipo, macrozona, zona } = request.data;
         if (!username || !email || !password || !tipo) {
             throw new HttpsError('invalid-argument', 'Faltan campos obligatorios.');
         }
@@ -131,6 +140,8 @@ exports.createSystemUser = onCall(
                 nombres: fullName.trim(),
                 tipo: tipo,
                 email: email.trim().toLowerCase(),
+                macrozona: (macrozona || '').trim(),
+                zona: (zona || '').trim(),
                 fechacreacion: FieldValue.serverTimestamp(),
                 creadoPor: callerUsername
             });
@@ -160,15 +171,28 @@ exports.deleteSystemUser = onCall(
         try {
             const callerDoc = await db.collection('usuarios').doc(callerUsername).get();
             const callerTipo = (callerDoc.data()?.tipo || '').toLowerCase();
-            if (callerTipo !== 'admin' && callerTipo !== 'administrador' && callerTipo !== 'supervisor') {
+
+            // Si no es admin/supervisor, ver si tiene permiso de usuario/zonal
+            const isPowerful = ['admin', 'administrador', 'supervisor'].includes(callerTipo);
+            const isBase = ['usuario', 'zonal'].includes(callerTipo);
+
+            if (!isPowerful && !isBase) {
                 throw new HttpsError('permission-denied', 'No permitido.');
             }
 
             const targetDoc = await db.collection('usuarios').doc(targetUid).get();
-            if (targetDoc.exists && callerTipo === 'supervisor') {
-                const tTipo = (targetDoc.data().tipo || '').toLowerCase();
+            if (!targetDoc.exists) throw new HttpsError('not-found', 'Usuario no encontrado.');
+
+            const tTipo = (targetDoc.data().tipo || '').toLowerCase();
+
+            // Reglas de nivel:
+            if (callerTipo === 'supervisor') {
                 if (['admin', 'administrador', 'supervisor'].includes(tTipo)) {
-                    throw new HttpsError('permission-denied', 'No permitido.');
+                    throw new HttpsError('permission-denied', 'Un supervisor no puede eliminar a administradores u otros supervisores.');
+                }
+            } else if (isBase) {
+                if (!['usuario', 'zonal'].includes(tTipo)) {
+                    throw new HttpsError('permission-denied', 'No tienes permisos para eliminar este tipo de usuario.');
                 }
             }
 
@@ -184,6 +208,79 @@ exports.deleteSystemUser = onCall(
 );
 
 /**
+ * deleteUsersBatch
+ * Elimina múltiples usuarios de Auth y Firestore.
+ */
+exports.deleteUsersBatch = onCall(
+    { region: 'us-central1', cors: true },
+    async (request) => {
+        if (!request.auth) throw new HttpsError('unauthenticated', 'No autenticado.');
+
+        const callerUsername = (request.auth.token?.email || '').split('@')[0].toLowerCase();
+        const { targetUids } = request.data;
+        if (!targetUids || !Array.isArray(targetUids) || targetUids.length === 0) {
+            throw new HttpsError('invalid-argument', 'Lista de UIDs requerida.');
+        }
+
+        const db = getFirestore();
+        try {
+            const callerDoc = await db.collection('usuarios').doc(callerUsername).get();
+            if (!callerDoc.exists) {
+                console.error('[deleteUsersBatch] Caller doc not found:', callerUsername);
+                throw new HttpsError('permission-denied', `Perfil de usuario no encontrado en Firestore para: ${callerUsername}`);
+            }
+
+            const callerTipo = (callerDoc.data()?.tipo || '').toLowerCase();
+            console.log('[deleteUsersBatch] Caller:', callerUsername, 'Tipo:', callerTipo);
+
+            const isPowerful = ['admin', 'administrador', 'supervisor'].includes(callerTipo);
+            const isBase = ['usuario', 'zonal'].includes(callerTipo);
+
+            if (!isPowerful && !isBase) {
+                throw new HttpsError('permission-denied', `Tu rol (${callerTipo}) no tiene permisos para realizar esta operación.`);
+            }
+
+            // Verificar permisos para cada usuario del batch
+            for (const uid of targetUids) {
+                const tDoc = await db.collection('usuarios').doc(uid).get();
+                if (tDoc.exists) {
+                    const tTipo = (tDoc.data().tipo || '').toLowerCase();
+
+                    if (callerTipo === 'supervisor') {
+                        if (['admin', 'administrador', 'supervisor'].includes(tTipo)) {
+                            throw new HttpsError('permission-denied', `No puedes eliminar a ${uid} (${tTipo}) porque es de rango igual o superior.`);
+                        }
+                    } else if (isBase) {
+                        if (!['usuario', 'zonal'].includes(tTipo)) {
+                            throw new HttpsError('permission-denied', `No tienes permiso para eliminar usuarios de rango ${tTipo}.`);
+                        }
+                    }
+                }
+            }
+
+            // Borrar de Auth
+            try {
+                await getAuth().deleteUsers(targetUids);
+            } catch (authErr) {
+                console.warn('[deleteUsersBatch] Auth deletion partial/failed:', authErr);
+            }
+
+            // Borrar de Firestore (Batched)
+            const batch = db.batch();
+            targetUids.forEach(uid => {
+                batch.delete(db.collection('usuarios').doc(uid));
+            });
+            await batch.commit();
+
+            return { success: true, count: targetUids.length };
+        } catch (err) {
+            console.error('[deleteUsersBatch] Error:', err);
+            throw new HttpsError('internal', err.message || 'Error al eliminar múltiples usuarios.');
+        }
+    }
+);
+
+/**
  * updateSystemUser
  * Actualiza el perfil de un usuario.
  */
@@ -193,7 +290,7 @@ exports.updateSystemUser = onCall(
         if (!request.auth) throw new HttpsError('unauthenticated', 'No autenticado.');
 
         const callerUsername = (request.auth.token?.email || '').split('@')[0].toLowerCase();
-        const { targetUid, nombres, tipo, email, notas } = request.data;
+        const { targetUid, nombres, tipo, email, notas, macrozona, zona } = request.data;
         if (!targetUid || !nombres || !tipo) {
             throw new HttpsError('invalid-argument', 'Datos incompletos.');
         }
@@ -226,7 +323,12 @@ exports.updateSystemUser = onCall(
                 throw new HttpsError('permission-denied', 'No permitido.');
             }
 
-            const upData = { nombres: nombres.trim(), tipo };
+            const upData = {
+                nombres: nombres.trim(),
+                tipo,
+                macrozona: (macrozona || '').trim(),
+                zona: (zona || '').trim()
+            };
             if (email) upData.email = email.trim().toLowerCase();
             if (notas !== undefined) upData.notas = notas.trim();
 
