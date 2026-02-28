@@ -65,6 +65,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- Navigation Logic ---
+    // Helper: hide ALL switchable views to prevent overlap
+    function hideAllViews() {
+        dashboardView.style.display = 'none';
+        tableSection.style.display = 'none';
+        reportsView.style.display = 'none';
+        filterSection.style.display = 'none';
+        document.getElementById('units-view').style.display = 'none';
+        document.getElementById('usuarios-view').style.display = 'none';
+        document.getElementById('audit-view').style.display = 'none';
+    }
+
     navLinks.forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
@@ -75,59 +86,32 @@ document.addEventListener('DOMContentLoaded', () => {
             const parentLi = link.closest('.nav-item');
             parentLi.classList.add('active');
 
+            // Hide everything first
+            hideAllViews();
+
             const linkText = link.querySelector('.link-text').textContent;
 
             if (linkText === 'Dashboard') {
                 currentView = 'dashboard';
                 dashboardView.style.display = 'grid';
                 tableSection.style.display = 'block';
-                reportsView.style.display = 'none';
                 filterSection.style.display = 'block';
-                document.getElementById('units-view').style.display = 'none';
             } else if (linkText === 'Reportes') {
                 currentView = 'reportes';
-                dashboardView.style.display = 'none';
-                tableSection.style.display = 'none';
                 reportsView.style.display = 'block';
                 filterSection.style.display = 'block';
-                document.getElementById('units-view').style.display = 'none';
                 updateReportsTable(getFilteredData());
             } else if (linkText === 'Gestión') {
                 currentView = 'gestion';
-                dashboardView.style.display = 'none';
-                tableSection.style.display = 'none';
-                reportsView.style.display = 'none';
-                filterSection.style.display = 'none';
                 document.getElementById('units-view').style.display = 'block';
-                document.getElementById('usuarios-view').style.display = 'none';
-                document.getElementById('audit-view').style.display = 'none';
             } else if (linkText === 'Usuarios') {
                 currentView = 'usuarios';
-                dashboardView.style.display = 'none';
-                tableSection.style.display = 'none';
-                reportsView.style.display = 'none';
-                filterSection.style.display = 'none';
-                document.getElementById('units-view').style.display = 'none';
-                document.getElementById('audit-view').style.display = 'none';
                 document.getElementById('usuarios-view').style.display = 'block';
             } else if (linkText === 'Auditoría') {
                 currentView = 'audit';
-                dashboardView.style.display = 'none';
-                tableSection.style.display = 'none';
-                reportsView.style.display = 'none';
-                filterSection.style.display = 'none';
-                document.getElementById('units-view').style.display = 'none';
-                document.getElementById('usuarios-view').style.display = 'none';
                 document.getElementById('audit-view').style.display = 'block';
             } else {
                 currentView = 'other';
-                dashboardView.style.display = 'none';
-                tableSection.style.display = 'none';
-                reportsView.style.display = 'none';
-                filterSection.style.display = 'none';
-                document.getElementById('units-view').style.display = 'none';
-                document.getElementById('usuarios-view').style.display = 'none';
-                document.getElementById('audit-view').style.display = 'none';
             }
         });
     });
@@ -479,33 +463,122 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
+    // ─── Pagination state for Reports ────────────────────────────
+    let reportsCurrentPage = 1;
+    const REPORTS_PAGE_SIZE = 20;
+    let reportsDataCache = [];
+
     function updateReportsTable(data) {
-        reportsTableBody.innerHTML = '';
+        reportsDataCache = data;
+        reportsCurrentPage = 1;
+        renderReportsPage();
 
-        data.forEach(row => {
-            const tr = document.createElement('tr');
-            const statusColor = row.estado === 'COMPLETADA' ? '#00f3ff' : '#ff003c';
-
-            tr.innerHTML = `
-                <td>${row.date ? row.date.toLocaleDateString() : 'N/A'}</td>
-                <td style="font-weight: 600; color: #fff;">${row.cliente}</td>
-                <td>${row.unidad}</td>
-                <td>${row.userName}</td>
-                <td>${row.descripcion}</td>
-                <td style="color: var(--primary); font-family: monospace;">${row.tiempoEstadia}</td>
-                <td><span style="color: ${statusColor}; border: 1px solid ${statusColor}; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem;">${row.estado}</span></td>
-                <td class="action-cell">
-                    <button class="icon-btn view-btn" title="Ver Detalles"><i class='bx bx-show'></i></button>
-                    <button class="icon-btn pdf-btn" title="Descargar PDF" onclick="generatePDF('${row.id}')"><i class='bx bxs-file-pdf'></i></button>
-                </td>
-            `;
-            reportsTableBody.appendChild(tr);
-        });
-
-        if (data.length === 0) {
-            reportsTableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 20px;">No se encontraron registros para generar reporte</td></tr>`;
+        // Setup scroll hint auto-hide
+        const scrollEl = document.getElementById('reports-table-scroll');
+        const hintEl = document.getElementById('reports-scroll-hint');
+        if (scrollEl && hintEl) {
+            // Show hint only if table overflows
+            if (scrollEl.scrollWidth > scrollEl.clientWidth) {
+                hintEl.classList.remove('hidden');
+            } else {
+                hintEl.classList.add('hidden');
+            }
+            // Hide hint once user scrolls
+            scrollEl.onscroll = () => {
+                if (scrollEl.scrollLeft > 30) {
+                    hintEl.classList.add('hidden');
+                }
+            };
         }
     }
+
+    function renderReportsPage() {
+        const data = reportsDataCache;
+        const total = data.length;
+        const pages = Math.max(1, Math.ceil(total / REPORTS_PAGE_SIZE));
+        const page = Math.min(reportsCurrentPage, pages);
+        const start = (page - 1) * REPORTS_PAGE_SIZE;
+        const slice = data.slice(start, start + REPORTS_PAGE_SIZE);
+
+        // Update count badge
+        const countLabel = document.getElementById('reports-total-label');
+        if (countLabel) countLabel.textContent = `${total} registro${total !== 1 ? 's' : ''}`;
+
+        // Render rows
+        reportsTableBody.innerHTML = '';
+
+        if (total === 0) {
+            reportsTableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 32px; color: var(--text-dim);">
+                <i class='bx bx-search-alt' style="font-size:1.5rem; display:block; margin-bottom:8px;"></i>
+                No se encontraron registros para generar reporte
+            </td></tr>`;
+        } else {
+            slice.forEach(row => {
+                const tr = document.createElement('tr');
+                const isOk = row.estado && row.estado.toUpperCase().includes('COMPLET');
+                const statusColor = isOk ? '#00f3ff' : '#ff003c';
+
+                tr.innerHTML = `
+                    <td>${row.date ? row.date.toLocaleDateString('es-PE') : 'N/A'}</td>
+                    <td style="font-weight: 600; color: #fff;">${row.cliente}</td>
+                    <td>${row.unidad}</td>
+                    <td><i class='bx bx-user' style="margin-right:4px;color:var(--primary);vertical-align:middle;"></i>${row.userName}</td>
+                    <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${row.descripcion}">${row.descripcion}</td>
+                    <td style="color: var(--primary); font-family: monospace;">${row.tiempoEstadia}</td>
+                    <td><span style="color:${statusColor}; border:1px solid ${statusColor}; padding:2px 10px; border-radius:20px; font-size:.72rem; letter-spacing:.5px; white-space:nowrap;">${row.estado}</span></td>
+                    <td class="action-cell">
+                        <button class="icon-btn view-btn" title="Ver Detalles"><i class='bx bx-show'></i></button>
+                        <button class="icon-btn pdf-btn" title="Descargar PDF" onclick="generatePDF('${row.id}')"><i class='bx bxs-file-pdf'></i></button>
+                    </td>
+                `;
+                reportsTableBody.appendChild(tr);
+            });
+        }
+
+        // ── Pagination controls ───────────────────────────────────
+        const pager = document.getElementById('reports-pager');
+        if (!pager) return;
+
+        if (total === 0 || pages <= 1) { pager.innerHTML = ''; return; }
+
+        // Generate page number buttons (max 5 visible)
+        let pageButtons = '';
+        const range = 2;
+        for (let p = 1; p <= pages; p++) {
+            if (p === 1 || p === pages || (p >= page - range && p <= page + range)) {
+                pageButtons += `<button class="pager-btn${p === page ? ' active' : ''}" data-rp="${p}">${p}</button>`;
+            } else if (p === page - range - 1 || p === page + range + 1) {
+                pageButtons += `<span class="pager-ellipsis">…</span>`;
+            }
+        }
+
+        pager.innerHTML = `
+            <div class="pager-info">
+                Mostrando <strong>${start + 1}–${Math.min(start + REPORTS_PAGE_SIZE, total)}</strong> de <strong>${total}</strong> registros
+            </div>
+            <div class="pager-controls">
+                <button class="pager-btn${page <= 1 ? ' disabled' : ''}" data-rp="1" ${page <= 1 ? 'disabled' : ''}><i class='bx bx-first-page'></i></button>
+                <button class="pager-btn${page <= 1 ? ' disabled' : ''}" data-rp="${page - 1}" ${page <= 1 ? 'disabled' : ''}><i class='bx bx-chevron-left'></i></button>
+                ${pageButtons}
+                <button class="pager-btn${page >= pages ? ' disabled' : ''}" data-rp="${page + 1}" ${page >= pages ? 'disabled' : ''}><i class='bx bx-chevron-right'></i></button>
+                <button class="pager-btn${page >= pages ? ' disabled' : ''}" data-rp="${pages}" ${page >= pages ? 'disabled' : ''}><i class='bx bx-last-page'></i></button>
+            </div>`;
+
+        // Wire up click handlers via delegation
+        pager.querySelectorAll('.pager-btn:not(.disabled)').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const target = parseInt(btn.getAttribute('data-rp'));
+                if (target >= 1 && target <= pages) {
+                    reportsCurrentPage = target;
+                    renderReportsPage();
+                    // Scroll table back to left on page change
+                    const scrollEl = document.getElementById('reports-table-scroll');
+                    if (scrollEl) scrollEl.scrollLeft = 0;
+                }
+            });
+        });
+    }
+
 
     // --- PDF Generation ---
     window.generatePDF = async (id) => {
@@ -544,7 +617,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Load logo as base64
             let logoBase64 = null;
             try {
-                const resp = await fetch('./imagenes/logo.webp');
+                const resp = await fetch('/imagenes/logo.webp');
                 const blob = await resp.blob();
                 logoBase64 = await new Promise((resolve) => {
                     const reader = new FileReader();
@@ -1836,8 +1909,12 @@ const NEON_MAP_STYLE = {
             }
         });
 
+        const USERS_PAGE_SIZE = 10;
+
         let _loaded = false;
         let _allUsers = [];       // [{uid, username, email, nombres, tipo, extra, ...}]
+        let _filteredUsers = [];
+        let _usersPage = 1;
         let _editingId = null;     // current Firestore doc id being edited/deleted
 
         //  DOM 
@@ -1845,6 +1922,8 @@ const NEON_MAP_STYLE = {
         const emptyState = document.getElementById('uv-empty');
         const totalCount = document.getElementById('uv-total-count');
         const statusText = document.getElementById('uv-status-text');
+        const usersPagerEl = document.getElementById('users-pager');
+        const usersScrollContainer = document.getElementById('users-table-scroll');
         const searchInput = document.getElementById('uv-search');
         const typeFilter = document.getElementById('uv-type-filter');
         const refreshBtn = document.getElementById('uv-refresh-btn');
@@ -2101,7 +2180,9 @@ const NEON_MAP_STYLE = {
                     });
                 });
 
-                renderTable(_allUsers);
+                _filteredUsers = _allUsers;
+                _usersPage = 1;
+                renderUsersPage();
                 if (totalCount) totalCount.textContent = _allUsers.length;
 
                 if (_allUsers.length === 0) {
@@ -2124,16 +2205,24 @@ const NEON_MAP_STYLE = {
 
 
 
-        //  Render table 
-        function renderTable(users) {
+        //  Render paginated table 
+        function renderUsersPage() {
+            const users = _filteredUsers;
             if (!users.length) {
                 tbody.innerHTML = '';
                 if (emptyState) emptyState.style.display = 'flex';
+                if (usersPagerEl) usersPagerEl.innerHTML = '';
                 return;
             }
             if (emptyState) emptyState.style.display = 'none';
 
-            tbody.innerHTML = users.map(u => {
+            const totalPages = Math.ceil(users.length / USERS_PAGE_SIZE);
+            if (_usersPage > totalPages) _usersPage = totalPages;
+            const start = (_usersPage - 1) * USERS_PAGE_SIZE;
+            const end = Math.min(start + USERS_PAGE_SIZE, users.length);
+            const pageData = users.slice(start, end);
+
+            tbody.innerHTML = pageData.map(u => {
                 const initials = (u.nombres || u.username).slice(0, 2).toUpperCase();
                 const emailDisplay = u.email
                     ? `<i class="bx bx-envelope"></i> ${u.email}`
@@ -2186,6 +2275,56 @@ const NEON_MAP_STYLE = {
 
             // Re-bind checkboxes after render
             bindCheckboxes();
+
+            // Scroll to top on page change
+            if (usersScrollContainer) usersScrollContainer.scrollTop = 0;
+
+            // Build pager
+            buildUsersPager(totalPages, start + 1, end, users.length);
+        }
+
+        function buildUsersPager(totalPages, from, to, total) {
+            if (!usersPagerEl) return;
+            if (totalPages <= 1) {
+                usersPagerEl.innerHTML = `<span style="font-size:.82rem;color:var(--text-dim)">Mostrando <b style="color:var(--primary)">${from}\u2013${to}</b> de <b style="color:var(--primary)">${total}</b> usuarios</span>`;
+                return;
+            }
+
+            let html = `<span style="font-size:.82rem;color:var(--text-dim)">Mostrando <b style="color:var(--primary)">${from}\u2013${to}</b> de <b style="color:var(--primary)">${total}</b> usuarios</span>`;
+            html += '<div style="display:flex;gap:4px;align-items:center">';
+
+            html += `<button class="pager-btn${_usersPage === 1 ? ' disabled' : ''}" data-page="1" title="Primera">\u00AB</button>`;
+            html += `<button class="pager-btn${_usersPage === 1 ? ' disabled' : ''}" data-page="${_usersPage - 1}" title="Anterior">\u2039</button>`;
+
+            const range = 2;
+            let startP = Math.max(1, _usersPage - range);
+            let endP = Math.min(totalPages, _usersPage + range);
+
+            if (startP > 1) html += `<button class="pager-btn" data-page="1">1</button>`;
+            if (startP > 2) html += `<span style="color:var(--text-dim);padding:0 4px">\u2026</span>`;
+
+            for (let p = startP; p <= endP; p++) {
+                html += `<button class="pager-btn${p === _usersPage ? ' active' : ''}" data-page="${p}">${p}</button>`;
+            }
+
+            if (endP < totalPages - 1) html += `<span style="color:var(--text-dim);padding:0 4px">\u2026</span>`;
+            if (endP < totalPages) html += `<button class="pager-btn" data-page="${totalPages}">${totalPages}</button>`;
+
+            html += `<button class="pager-btn${_usersPage === totalPages ? ' disabled' : ''}" data-page="${_usersPage + 1}" title="Siguiente">\u203A</button>`;
+            html += `<button class="pager-btn${_usersPage === totalPages ? ' disabled' : ''}" data-page="${totalPages}" title="\u00DAltima">\u00BB</button>`;
+            html += '</div>';
+
+            usersPagerEl.innerHTML = html;
+
+            usersPagerEl.querySelectorAll('.pager-btn:not(.disabled)').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const p = parseInt(btn.dataset.page, 10);
+                    if (p >= 1 && p <= totalPages && p !== _usersPage) {
+                        _usersPage = p;
+                        renderUsersPage();
+                    }
+                });
+            });
         }
 
         // --- Custom Confirmation Modal Logic ---
@@ -2292,7 +2431,9 @@ const NEON_MAP_STYLE = {
                     // Remove from local cache
                     _allUsers = _allUsers.filter(u => !_selectedUids.has(u.username));
                     _selectedUids.clear();
-                    renderTable(_allUsers);
+                    _filteredUsers = _allUsers;
+                    _usersPage = 1;
+                    renderUsersPage();
                     updateUISelection();
                     if (totalCount) totalCount.textContent = _allUsers.length;
                     setStatus(`${_allUsers.length} usuario(s) restantes`);
@@ -2321,7 +2462,7 @@ const NEON_MAP_STYLE = {
         function applyFilters() {
             const q = (searchInput?.value || '').toLowerCase();
             const tipo = (typeFilter?.value || '').toLowerCase();
-            const filtered = _allUsers.filter(u => {
+            _filteredUsers = _allUsers.filter(u => {
                 const matchQ = !q ||
                     u.username.toLowerCase().includes(q) ||
                     (u.nombres || '').toLowerCase().includes(q) ||
@@ -2329,8 +2470,9 @@ const NEON_MAP_STYLE = {
                 const matchTipo = !tipo || (u.tipo || '').toLowerCase() === tipo;
                 return matchQ && matchTipo;
             });
-            renderTable(filtered);
-            setStatus(`Mostrando ${filtered.length} de ${_allUsers.length} usuario(s)`);
+            _usersPage = 1;
+            renderUsersPage();
+            setStatus(`Mostrando ${_filteredUsers.length} de ${_allUsers.length} usuario(s)`);
         }
 
         searchInput?.addEventListener('input', applyFilters);
@@ -2403,7 +2545,8 @@ const NEON_MAP_STYLE = {
                     _allUsers[idx].macrozona = updateData.macrozona;
                     _allUsers[idx].zona = updateData.zona;
                 }
-                renderTable(_allUsers);
+                _filteredUsers = _allUsers;
+                renderUsersPage();
                 if (totalCount) totalCount.textContent = _allUsers.length;
 
                 setModalMsg(meditMsg, 'Cambios guardados correctamente.', 'success');
@@ -2439,7 +2582,8 @@ const NEON_MAP_STYLE = {
                 addAuditLog('DELETE', 'USUARIOS', _editingId, { motivo: 'Eliminación manual' });
 
                 _allUsers = _allUsers.filter(u => u.username !== _editingId);
-                renderTable(_allUsers);
+                _filteredUsers = _allUsers;
+                renderUsersPage();
                 if (totalCount) totalCount.textContent = _allUsers.length;
                 setStatus(`${_allUsers.length} usuario(s) registrado(s)`);
                 setModalMsg(mdelMsg, 'Usuario eliminado por completo.', 'info');
@@ -2570,6 +2714,8 @@ const NEON_MAP_STYLE = {
 */
 (function initAuditManager() {
     document.addEventListener('DOMContentLoaded', async () => {
+        const AUDIT_PAGE_SIZE = 10;
+
         // Navigation listener to lazy load
         const navLinks = document.querySelectorAll('.nav-link');
         navLinks.forEach(link => {
@@ -2582,11 +2728,15 @@ const NEON_MAP_STYLE = {
 
         let _loaded = false;
         let _allLogs = [];
+        let _filteredLogs = [];
+        let _currentPage = 1;
 
         // DOM Elements
         const tbody = document.getElementById('av-tbody');
         const emptyState = document.getElementById('av-empty');
         const statusText = document.getElementById('av-status-text');
+        const pagerEl = document.getElementById('audit-pager');
+        const scrollContainer = document.getElementById('audit-table-scroll');
         const applyBtn = document.getElementById('av-apply-filters');
         const clearBtn = document.getElementById('av-clear-filters');
         const refreshBtn = document.getElementById('av-refresh-btn');
@@ -2609,24 +2759,35 @@ const NEON_MAP_STYLE = {
                 const q = query(logsRef, orderBy('timestamp', 'desc'), limit(250));
                 const snap = await getDocs(q);
                 _allLogs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                _filteredLogs = _allLogs;
+                _currentPage = 1;
 
-                renderTable(_allLogs);
+                renderPage();
             } catch (e) {
                 console.error(e);
                 setStatus('Error al cargar logs.', false);
             }
         }
 
-        function renderTable(logs) {
+        function renderPage() {
+            const logs = _filteredLogs;
+
             if (!logs.length) {
                 tbody.innerHTML = '';
                 emptyState.style.display = 'flex';
+                pagerEl.innerHTML = '';
                 setStatus('No hay registros.', false);
                 return;
             }
             emptyState.style.display = 'none';
 
-            tbody.innerHTML = logs.map(l => {
+            const totalPages = Math.ceil(logs.length / AUDIT_PAGE_SIZE);
+            if (_currentPage > totalPages) _currentPage = totalPages;
+            const start = (_currentPage - 1) * AUDIT_PAGE_SIZE;
+            const end = Math.min(start + AUDIT_PAGE_SIZE, logs.length);
+            const pageData = logs.slice(start, end);
+
+            tbody.innerHTML = pageData.map(l => {
                 const ts = l.timestamp?.toDate ? l.timestamp.toDate().toLocaleString('es-PE') : '---';
                 return `<tr>
                     <td style="color:#00e5ff; font-family:monospace; font-size:0.85rem">${ts}</td>
@@ -2637,7 +2798,61 @@ const NEON_MAP_STYLE = {
                     <td style="font-size:0.75rem; color:rgba(255,255,255,0.5)">${l.detalles}</td>
                 </tr>`;
             }).join('');
+
             setStatus(`${logs.length} registros cargados.`, true);
+
+            // Scroll to top on page change
+            if (scrollContainer) scrollContainer.scrollTop = 0;
+
+            // Build pager
+            buildPager(totalPages, start + 1, end, logs.length);
+        }
+
+        function buildPager(totalPages, from, to, total) {
+            if (totalPages <= 1) {
+                pagerEl.innerHTML = `<span style="font-size:.82rem;color:var(--text-dim)">Mostrando <b style="color:var(--primary)">${from}–${to}</b> de <b style="color:var(--primary)">${total}</b> registros</span>`;
+                return;
+            }
+
+            let html = `<span style="font-size:.82rem;color:var(--text-dim)">Mostrando <b style="color:var(--primary)">${from}–${to}</b> de <b style="color:var(--primary)">${total}</b> registros</span>`;
+            html += '<div style="display:flex;gap:4px;align-items:center">';
+
+            // first & prev
+            html += `<button class="pager-btn${_currentPage === 1 ? ' disabled' : ''}" data-page="1" title="Primera">«</button>`;
+            html += `<button class="pager-btn${_currentPage === 1 ? ' disabled' : ''}" data-page="${_currentPage - 1}" title="Anterior">‹</button>`;
+
+            // Page numbers
+            const range = 2;
+            let startP = Math.max(1, _currentPage - range);
+            let endP = Math.min(totalPages, _currentPage + range);
+
+            if (startP > 1) html += `<button class="pager-btn" data-page="1">1</button>`;
+            if (startP > 2) html += `<span style="color:var(--text-dim);padding:0 4px">…</span>`;
+
+            for (let p = startP; p <= endP; p++) {
+                html += `<button class="pager-btn${p === _currentPage ? ' active' : ''}" data-page="${p}">${p}</button>`;
+            }
+
+            if (endP < totalPages - 1) html += `<span style="color:var(--text-dim);padding:0 4px">…</span>`;
+            if (endP < totalPages) html += `<button class="pager-btn" data-page="${totalPages}">${totalPages}</button>`;
+
+            // next & last
+            html += `<button class="pager-btn${_currentPage === totalPages ? ' disabled' : ''}" data-page="${_currentPage + 1}" title="Siguiente">›</button>`;
+            html += `<button class="pager-btn${_currentPage === totalPages ? ' disabled' : ''}" data-page="${totalPages}" title="Última">»</button>`;
+            html += '</div>';
+
+            pagerEl.innerHTML = html;
+
+            // Attach events
+            pagerEl.querySelectorAll('.pager-btn:not(.disabled)').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const p = parseInt(btn.dataset.page, 10);
+                    if (p >= 1 && p <= totalPages && p !== _currentPage) {
+                        _currentPage = p;
+                        renderPage();
+                    }
+                });
+            });
         }
 
         function getActionClass(acc) {
@@ -2654,7 +2869,7 @@ const NEON_MAP_STYLE = {
             const ds = dateStart.value;
             const de = dateEnd.value;
 
-            const filtered = _allLogs.filter(l => {
+            _filteredLogs = _allLogs.filter(l => {
                 const matchU = !u || l.usuario.toLowerCase().includes(u);
                 const ts = l.timestamp?.toDate ? l.timestamp.toDate() : null;
                 let matchD = true;
@@ -2664,7 +2879,8 @@ const NEON_MAP_STYLE = {
                 }
                 return matchU && matchD;
             });
-            renderTable(filtered);
+            _currentPage = 1;
+            renderPage();
         }
 
         applyBtn.addEventListener('click', applyFilters);
@@ -2672,7 +2888,9 @@ const NEON_MAP_STYLE = {
             dateStart.value = '';
             dateEnd.value = '';
             userFilter.value = '';
-            applyFilters();
+            _filteredLogs = _allLogs;
+            _currentPage = 1;
+            renderPage();
         });
         refreshBtn.addEventListener('click', loadLogs);
     });

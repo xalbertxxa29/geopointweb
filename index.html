@@ -548,8 +548,13 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            /* starts in center, then rockets right */
+            /* starts paused — unpaused by JS once logo image loads */
             animation: hs-warp 2.4s cubic-bezier(.4, 0, .2, 1) forwards;
+            animation-play-state: paused;
+        }
+
+        #hs-logo-wrap.hs-ready {
+            animation-play-state: running;
         }
 
         @keyframes hs-warp {
@@ -645,7 +650,7 @@
                     <div class="ring ring-1"></div>
                     <div class="ring ring-2"></div>
                     <div class="ring ring-3"></div>
-                    <img src="./imagenes/logo.webp" alt="Liderman" class="logo-img" />
+                    <img src="/imagenes/logo.webp" alt="Liderman" class="logo-img" />
                 </div>
 
                 <p class="brand-name">LIDERMAN</p>
@@ -743,7 +748,7 @@
             </svg>
 
             <!-- Logo image -->
-            <img id="hs-logo" src="./imagenes/logo.webp" alt="Logo" />
+            <img id="hs-logo" src="/imagenes/logo.webp" alt="Logo" />
         </div>
     </div>
 
@@ -752,6 +757,22 @@
             const overlay = document.getElementById('hs-overlay');
             const canvas = document.getElementById('hs-canvas');
             const ctx = canvas.getContext('2d');
+            const logoWrap = document.getElementById('hs-logo-wrap');
+            const logoImg = document.getElementById('hs-logo');
+
+            /* Wait for logo to load before starting warp animation */
+            function startWarp() {
+                logoWrap.classList.add('hs-ready');
+            }
+
+            if (logoImg.complete && logoImg.naturalWidth > 0) {
+                startWarp();
+            } else {
+                logoImg.addEventListener('load', startWarp);
+                logoImg.addEventListener('error', startWarp); // start anyway if error
+                // Safety timeout — start after 500ms regardless
+                setTimeout(startWarp, 500);
+            }
 
             /*  Resize canvas  */
             function resize() {
@@ -770,8 +791,8 @@
 
             function mkLine() {
                 const angle = Math.random() * Math.PI * 2;
-                const dist = Math.random() * 80 + 20;     // start near center
-                const speed = Math.random() * 28 + 12;     // px per frame
+                const dist = Math.random() * 80 + 20;
+                const speed = Math.random() * 28 + 12;
                 const len = Math.random() * 180 + 40;
                 const colors = ['#00d4ff', '#00ff88', '#ffffff', '#ff00ff', '#ffe066'];
                 return {
@@ -786,23 +807,20 @@
             }
 
             let startTime = null;
-            const TOTAL_MS = 2500;   // total animation duration
+            const TOTAL_MS = 2500;
 
             function draw(ts) {
                 if (!startTime) startTime = ts;
                 const elapsed = ts - startTime;
-                const progress = Math.min(elapsed / TOTAL_MS, 1); // 0..1
+                const progress = Math.min(elapsed / TOTAL_MS, 1);
 
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-                // speed multiplier: slow at start, then explodes
                 const speedMult = 0.3 + progress * progress * 9;
 
                 lines.forEach(l => {
-                    // advance
                     l.dist += l.speed * speedMult * 0.25;
 
-                    // reset if too far
                     const maxDist = Math.hypot(canvas.width, canvas.height);
                     if (l.dist > maxDist * 0.6) {
                         Object.assign(l, mkLine());
@@ -830,7 +848,6 @@
 
                 ctx.globalAlpha = 1;
 
-                // add central lens-flare glow for the last 30%
                 if (progress > 0.65) {
                     const flareAlpha = (progress - 0.65) / 0.35;
                     const grad2 = ctx.createRadialGradient(cx(), cy(), 0, cx(), cy(), 300 * flareAlpha);
@@ -844,7 +861,6 @@
                 if (elapsed < TOTAL_MS) {
                     requestAnimationFrame(draw);
                 } else {
-                    // Fade out overlay, reveal login UI
                     overlay.classList.add('hs-done');
                     setTimeout(() => overlay.remove(), 950);
                 }

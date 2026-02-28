@@ -818,6 +818,563 @@ body {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   REPORTS TABLE — Premium Scroll & Pagination
+   ═══════════════════════════════════════════════════════════════ */
+
+.reports-panel {
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 220px);
+}
+
+/* ── Header meta (record count) ─────────────────────────────── */
+.reports-header-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.reports-count-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: .78rem;
+    color: var(--primary);
+    background: rgba(0, 212, 255, 0.06);
+    border: 1px solid rgba(0, 212, 255, 0.2);
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-family: 'Inter', sans-serif;
+    letter-spacing: .5px;
+    font-weight: 600;
+    animation: badge-pulse 3s ease-in-out infinite;
+}
+
+@keyframes badge-pulse {
+
+    0%,
+    100% {
+        border-color: rgba(0, 212, 255, 0.2);
+    }
+
+    50% {
+        border-color: rgba(0, 212, 255, 0.45);
+        box-shadow: 0 0 8px rgba(0, 212, 255, 0.15);
+    }
+}
+
+.reports-count-badge i {
+    font-size: .9rem;
+}
+
+/* ── Scroll hint ────────────────────────────────────────────── */
+.reports-scroll-hint {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 22px;
+    font-size: .72rem;
+    color: rgba(0, 212, 255, 0.5);
+    letter-spacing: .5px;
+    background: linear-gradient(90deg, transparent 60%, rgba(0, 212, 255, 0.04));
+    border-bottom: 1px solid rgba(0, 212, 255, 0.04);
+    transition: opacity 0.4s, height 0.4s, padding 0.4s;
+}
+
+.reports-scroll-hint i {
+    font-size: .85rem;
+    animation: hint-bounce 1.5s ease-in-out infinite;
+}
+
+@keyframes hint-bounce {
+
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+
+    50% {
+        transform: translateX(5px);
+    }
+}
+
+.reports-scroll-hint.hidden {
+    opacity: 0;
+    pointer-events: none;
+    height: 0;
+    padding: 0 22px;
+    border: none;
+    overflow: hidden;
+}
+
+/* ── Table scroll container (BOTH axes) ─────────────────────── */
+.reports-table-scroll {
+    overflow: auto;
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    scroll-behavior: smooth;
+}
+
+/* ── Custom Scrollbar — Vertical ────────────────────────────── */
+.reports-table-scroll::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+}
+
+.reports-table-scroll::-webkit-scrollbar-track {
+    background: rgba(0, 20, 50, 0.3);
+    border-radius: 10px;
+}
+
+.reports-table-scroll::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, var(--primary), rgba(0, 150, 200, 0.35));
+    border-radius: 10px;
+    border: 1px solid rgba(0, 212, 255, 0.1);
+}
+
+.reports-table-scroll::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, var(--primary), rgba(0, 200, 255, 0.6));
+    box-shadow: 0 0 6px rgba(0, 212, 255, 0.4);
+}
+
+/* Scrollbar corner */
+.reports-table-scroll::-webkit-scrollbar-corner {
+    background: rgba(0, 20, 50, 0.3);
+}
+
+/* ── Reports table ──────────────────────────────────────────── */
+.reports-table {
+    min-width: 960px;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+/* ── Sticky header ──────────────────────────────────────────── */
+.reports-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 12;
+    background: linear-gradient(180deg, rgba(4, 16, 42, 0.98) 0%, rgba(4, 16, 42, 0.95) 100%);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-bottom: 2px solid rgba(0, 212, 255, 0.15);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+    padding: 15px 20px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: .72rem;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--primary);
+    text-align: left;
+    white-space: nowrap;
+    transition: color 0.3s;
+}
+
+/* Subtle glow line under sticky header */
+.reports-table thead th::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 1px;
+    background: linear-gradient(90deg,
+            transparent,
+            rgba(0, 212, 255, 0.3) 20%,
+            rgba(0, 212, 255, 0.5) 50%,
+            rgba(0, 212, 255, 0.3) 80%,
+            transparent);
+}
+
+/* ── Row styles ─────────────────────────────────────────────── */
+.reports-table tbody tr {
+    transition: all 0.25s ease;
+    animation: row-fade-in 0.35s ease-out both;
+}
+
+.reports-table tbody tr:nth-child(even) {
+    background: rgba(0, 212, 255, 0.015);
+}
+
+.reports-table tbody tr:hover {
+    background: rgba(0, 212, 255, 0.06);
+    box-shadow: inset 3px 0 0 var(--primary), 0 0 20px rgba(0, 212, 255, 0.05);
+}
+
+.reports-table tbody tr:hover td {
+    color: var(--text);
+}
+
+@keyframes row-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+/* Stagger row animations */
+.reports-table tbody tr:nth-child(1) {
+    animation-delay: 0.02s;
+}
+
+.reports-table tbody tr:nth-child(2) {
+    animation-delay: 0.04s;
+}
+
+.reports-table tbody tr:nth-child(3) {
+    animation-delay: 0.06s;
+}
+
+.reports-table tbody tr:nth-child(4) {
+    animation-delay: 0.08s;
+}
+
+.reports-table tbody tr:nth-child(5) {
+    animation-delay: 0.10s;
+}
+
+.reports-table tbody tr:nth-child(6) {
+    animation-delay: 0.12s;
+}
+
+.reports-table tbody tr:nth-child(7) {
+    animation-delay: 0.14s;
+}
+
+.reports-table tbody tr:nth-child(8) {
+    animation-delay: 0.16s;
+}
+
+.reports-table tbody tr:nth-child(9) {
+    animation-delay: 0.18s;
+}
+
+.reports-table tbody tr:nth-child(10) {
+    animation-delay: 0.20s;
+}
+
+.reports-table tbody tr:nth-child(n+11) {
+    animation-delay: 0.22s;
+}
+
+/* ── Cell styles ────────────────────────────────────────────── */
+.reports-table td {
+    padding: 14px 20px;
+    border-bottom: 1px solid rgba(0, 212, 255, 0.04);
+    color: var(--text-dim);
+    font-size: .875rem;
+    transition: all 0.25s;
+    white-space: nowrap;
+}
+
+/* ── Sticky Actions column ──────────────────────────────────── */
+.reports-table th:last-child,
+.reports-table td:last-child {
+    position: sticky;
+    right: 0;
+    z-index: 8;
+    background: rgba(4, 16, 42, 0.97);
+    box-shadow: -8px 0 20px rgba(0, 0, 0, 0.5);
+}
+
+.reports-table th:last-child {
+    z-index: 14;
+    background: rgba(4, 16, 42, 0.99);
+}
+
+.reports-table tr:hover td:last-child {
+    background: rgba(4, 22, 55, 0.98);
+}
+
+/* ── Reports pager ──────────────────────────────────────────── */
+.reports-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 14px 22px;
+    border-top: 1px solid rgba(0, 212, 255, 0.1);
+    background: linear-gradient(180deg, rgba(2, 8, 23, 0.5), rgba(4, 16, 42, 0.6));
+    flex-shrink: 0;
+}
+
+.reports-pager:empty {
+    display: none;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   AUDIT TABLE — Scroll & Pagination
+   ═══════════════════════════════════════════════════════════════ */
+
+.audit-table-wrap {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* ── Scroll container ───────────────────────────────────────── */
+.audit-table-scroll {
+    overflow: auto;
+    flex: 1;
+    min-height: 0;
+    max-height: calc(100vh - 380px);
+    scroll-behavior: smooth;
+}
+
+.audit-table-scroll::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+}
+
+.audit-table-scroll::-webkit-scrollbar-track {
+    background: rgba(0, 20, 50, 0.3);
+    border-radius: 10px;
+}
+
+.audit-table-scroll::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, var(--primary), rgba(0, 150, 200, 0.35));
+    border-radius: 10px;
+}
+
+.audit-table-scroll::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, var(--primary), rgba(0, 200, 255, 0.6));
+    box-shadow: 0 0 6px rgba(0, 212, 255, 0.4);
+}
+
+.audit-table-scroll::-webkit-scrollbar-corner {
+    background: rgba(0, 20, 50, 0.3);
+}
+
+/* ── Sticky header ──────────────────────────────────────────── */
+.audit-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 12;
+    background: linear-gradient(180deg, rgba(4, 16, 42, 0.98), rgba(4, 16, 42, 0.95));
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-bottom: 2px solid rgba(0, 212, 255, 0.15);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+.audit-table thead th::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.3) 20%, rgba(0, 212, 255, 0.5) 50%, rgba(0, 212, 255, 0.3) 80%, transparent);
+}
+
+/* ── Row animations ─────────────────────────────────────────── */
+.audit-table tbody tr {
+    transition: all 0.25s ease;
+    animation: row-fade-in 0.3s ease-out both;
+}
+
+.audit-table tbody tr:nth-child(1) {
+    animation-delay: 0.02s;
+}
+
+.audit-table tbody tr:nth-child(2) {
+    animation-delay: 0.04s;
+}
+
+.audit-table tbody tr:nth-child(3) {
+    animation-delay: 0.06s;
+}
+
+.audit-table tbody tr:nth-child(4) {
+    animation-delay: 0.08s;
+}
+
+.audit-table tbody tr:nth-child(5) {
+    animation-delay: 0.10s;
+}
+
+.audit-table tbody tr:nth-child(6) {
+    animation-delay: 0.12s;
+}
+
+.audit-table tbody tr:nth-child(7) {
+    animation-delay: 0.14s;
+}
+
+.audit-table tbody tr:nth-child(8) {
+    animation-delay: 0.16s;
+}
+
+.audit-table tbody tr:nth-child(9) {
+    animation-delay: 0.18s;
+}
+
+.audit-table tbody tr:nth-child(10) {
+    animation-delay: 0.20s;
+}
+
+.audit-table tbody tr:hover {
+    background: rgba(0, 212, 255, 0.06);
+    box-shadow: inset 3px 0 0 var(--primary), 0 0 20px rgba(0, 212, 255, 0.05);
+}
+
+/* ── Audit pager ────────────────────────────────────────────── */
+.audit-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 14px 22px;
+    border-top: 1px solid rgba(0, 212, 255, 0.1);
+    background: linear-gradient(180deg, rgba(2, 8, 23, 0.5), rgba(4, 16, 42, 0.6));
+    flex-shrink: 0;
+}
+
+.audit-pager:empty {
+    display: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   USERS TABLE — Scroll & Pagination
+   ═══════════════════════════════════════════════════════════════ */
+
+.users-table-wrap {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.users-table-scroll {
+    overflow: auto;
+    flex: 1;
+    min-height: 0;
+    max-height: calc(100vh - 420px);
+    scroll-behavior: smooth;
+}
+
+.users-table-scroll::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+}
+
+.users-table-scroll::-webkit-scrollbar-track {
+    background: rgba(0, 20, 50, 0.3);
+    border-radius: 10px;
+}
+
+.users-table-scroll::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, var(--primary), rgba(0, 150, 200, 0.35));
+    border-radius: 10px;
+}
+
+.users-table-scroll::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, var(--primary), rgba(0, 200, 255, 0.6));
+    box-shadow: 0 0 6px rgba(0, 212, 255, 0.4);
+}
+
+.users-table-scroll::-webkit-scrollbar-corner {
+    background: rgba(0, 20, 50, 0.3);
+}
+
+.users-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 12;
+    background: linear-gradient(180deg, rgba(4, 16, 42, 0.98), rgba(4, 16, 42, 0.95));
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-bottom: 2px solid rgba(0, 212, 255, 0.15);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+.users-table thead th::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.3) 20%, rgba(0, 212, 255, 0.5) 50%, rgba(0, 212, 255, 0.3) 80%, transparent);
+}
+
+.users-table tbody tr {
+    transition: all 0.25s ease;
+    animation: row-fade-in 0.3s ease-out both;
+}
+
+.users-table tbody tr:nth-child(1) {
+    animation-delay: 0.02s;
+}
+
+.users-table tbody tr:nth-child(2) {
+    animation-delay: 0.04s;
+}
+
+.users-table tbody tr:nth-child(3) {
+    animation-delay: 0.06s;
+}
+
+.users-table tbody tr:nth-child(4) {
+    animation-delay: 0.08s;
+}
+
+.users-table tbody tr:nth-child(5) {
+    animation-delay: 0.10s;
+}
+
+.users-table tbody tr:nth-child(6) {
+    animation-delay: 0.12s;
+}
+
+.users-table tbody tr:nth-child(7) {
+    animation-delay: 0.14s;
+}
+
+.users-table tbody tr:nth-child(8) {
+    animation-delay: 0.16s;
+}
+
+.users-table tbody tr:nth-child(9) {
+    animation-delay: 0.18s;
+}
+
+.users-table tbody tr:nth-child(10) {
+    animation-delay: 0.20s;
+}
+
+.users-table tbody tr:hover {
+    background: rgba(0, 212, 255, 0.06);
+    box-shadow: inset 3px 0 0 var(--primary), 0 0 20px rgba(0, 212, 255, 0.05);
+}
+
+.users-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 14px 22px;
+    border-top: 1px solid rgba(0, 212, 255, 0.1);
+    background: linear-gradient(180deg, rgba(2, 8, 23, 0.5), rgba(4, 16, 42, 0.6));
+    flex-shrink: 0;
+}
+
+.users-pager:empty {
+    display: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════
    GESTIÓN DE UNIDADES
    ═══════════════════════════════════════════════════════════════ */
 

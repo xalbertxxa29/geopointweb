@@ -56,7 +56,7 @@ function buildOverlay() {
 
             <!-- Logo -->
             <div class="gl-logo-wrap">
-                <img class="gl-logo" src="./imagenes/logo.webp" alt="Logo">
+                <img class="gl-logo" src="/imagenes/logo.webp" alt="Logo">
                 <div class="gl-logo-glow"></div>
             </div>
         </div>

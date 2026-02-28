@@ -192,12 +192,24 @@
 
                     <!-- Reports Section (Initially Hidden) -->
                     <div id="reports-view" style="display: none;">
-                        <div class="glass-panel table-section">
+                        <div class="glass-panel reports-panel">
                             <div class="panel-header">
                                 <h3><i class='bx bxs-file-pdf'></i> Generación de Reportes</h3>
+                                <div class="reports-header-meta">
+                                    <span class="reports-count-badge" id="reports-count-badge">
+                                        <i class='bx bx-data'></i>
+                                        <span id="reports-total-label">0 registros</span>
+                                    </span>
+                                </div>
                             </div>
-                            <div class="table-responsive">
-                                <table class="modern-table">
+
+                            <!-- Scroll hint indicator -->
+                            <div class="reports-scroll-hint" id="reports-scroll-hint">
+                                <i class='bx bx-chevrons-right'></i> Desliza para ver más columnas
+                            </div>
+
+                            <div class="reports-table-scroll" id="reports-table-scroll">
+                                <table class="modern-table reports-table" id="reports-main-table">
                                     <thead>
                                         <tr>
                                             <th>Fecha</th>
@@ -215,6 +227,9 @@
                                     </tbody>
                                 </table>
                             </div>
+
+                            <!-- Pagination -->
+                            <div class="reports-pager" id="reports-pager"></div>
                         </div>
                     </div>
 
@@ -559,28 +574,32 @@
                         </div>
 
                         <!-- Users table -->
-                        <div class="uv-table-wrap">
-                            <table class="uv-table" id="uv-table">
-                                <thead>
-                                    <tr>
-                                        <th style="width: 40px;">
-                                            <input type="checkbox" id="uv-select-all" class="uv-checkbox">
-                                        </th>
-                                        <th><i class='bx bxs-user'></i> Usuario</th>
-                                        <th><i class='bx bx-envelope'></i> Correo</th>
-                                        <th><i class='bx bx-id-card'></i> Nombre Completo</th>
-                                        <th><i class='bx bx-shield'></i> Tipo</th>
-                                        <th><i class='bx bx-dots-horizontal-rounded'></i> Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="uv-tbody">
-                                    <!-- Dynamically filled -->
-                                </tbody>
-                            </table>
+                        <div class="uv-table-wrap users-table-wrap">
+                            <div class="users-table-scroll" id="users-table-scroll">
+                                <table class="uv-table users-table" id="uv-table">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 40px;">
+                                                <input type="checkbox" id="uv-select-all" class="uv-checkbox">
+                                            </th>
+                                            <th><i class='bx bxs-user'></i> Usuario</th>
+                                            <th><i class='bx bx-envelope'></i> Correo</th>
+                                            <th><i class='bx bx-id-card'></i> Nombre Completo</th>
+                                            <th><i class='bx bx-shield'></i> Tipo</th>
+                                            <th><i class='bx bx-dots-horizontal-rounded'></i> Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="uv-tbody">
+                                        <!-- Dynamically filled -->
+                                    </tbody>
+                                </table>
+                            </div>
                             <div class="uv-empty" id="uv-empty" style="display:none;">
                                 <i class='bx bx-user-x'></i>
                                 <p>No se encontraron usuarios</p>
                             </div>
+                            <!-- Pagination -->
+                            <div class="users-pager" id="users-pager"></div>
                         </div>
 
                     </div><!-- /usuarios-view -->
@@ -639,26 +658,30 @@
                         </div>
 
                         <!-- Logs table -->
-                        <div class="uv-table-wrap">
-                            <table class="uv-table" id="av-table">
-                                <thead>
-                                    <tr>
-                                        <th><i class='bx bx-time'></i> Fecha y Hora</th>
-                                        <th><i class='bx bx-user'></i> Usuario</th>
-                                        <th><i class='bx bx-bolt-circle'></i> Acción</th>
-                                        <th><i class='bx bx-folder'></i> Colección</th>
-                                        <th><i class='bx bx-hash'></i> Documento</th>
-                                        <th><i class='bx bx-info-circle'></i> Detalles</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="av-tbody">
-                                    <!-- Dynamically filled -->
-                                </tbody>
-                            </table>
+                        <div class="uv-table-wrap audit-table-wrap">
+                            <div class="audit-table-scroll" id="audit-table-scroll">
+                                <table class="uv-table audit-table" id="av-table">
+                                    <thead>
+                                        <tr>
+                                            <th><i class='bx bx-time'></i> Fecha y Hora</th>
+                                            <th><i class='bx bx-user'></i> Usuario</th>
+                                            <th><i class='bx bx-bolt-circle'></i> Acción</th>
+                                            <th><i class='bx bx-folder'></i> Colección</th>
+                                            <th><i class='bx bx-hash'></i> Documento</th>
+                                            <th><i class='bx bx-info-circle'></i> Detalles</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="av-tbody">
+                                        <!-- Dynamically filled -->
+                                    </tbody>
+                                </table>
+                            </div>
                             <div class="uv-empty" id="av-empty" style="display:none;">
                                 <i class='bx bx-history'></i>
                                 <p>No se encontraron registros de auditoría</p>
                             </div>
+                            <!-- Pagination -->
+                            <div class="audit-pager" id="audit-pager"></div>
                         </div>
                     </div><!-- /audit-view -->
 
