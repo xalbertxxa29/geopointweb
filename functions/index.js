@@ -19,13 +19,40 @@ exports.updateUserPassword = onCall(
 
         const db = getFirestore();
         const callerDoc = await db.collection('usuarios').doc(callerUsername).get();
-        if (!callerDoc.exists || !['admin', 'administrador'].includes((callerDoc.data().tipo || '').toLowerCase())) {
-            throw new HttpsError('permission-denied', 'Permisos insuficientes.');
+        if (!callerDoc.exists) {
+            throw new HttpsError('permission-denied', 'Perfil no encontrado.');
+        }
+
+        const callerTipo = (callerDoc.data().tipo || '').toLowerCase();
+        const isAdmin = ['admin', 'administrador'].includes(callerTipo);
+        const isSuper = callerTipo === 'supervisor';
+        const isUser = callerTipo === 'usuario';
+
+        if (!isAdmin && !isSuper && !isUser) {
+            throw new HttpsError('permission-denied', 'Tu rol no tiene permisos para cambiar contraseñas.');
         }
 
         const { targetEmail, newPassword } = request.data;
         if (!targetEmail || !newPassword || newPassword.length < 8) {
             throw new HttpsError('invalid-argument', 'Datos inválidos.');
+        }
+
+        // Verify caller has permission over the target user
+        if (!isAdmin) {
+            // Find target user doc by email
+            const usersSnap = await db.collection('usuarios')
+                .where('email', '==', targetEmail.toLowerCase()).limit(1).get();
+
+            if (!usersSnap.empty) {
+                const targetTipo = (usersSnap.docs[0].data().tipo || '').toLowerCase();
+
+                if (isSuper && ['admin', 'administrador'].includes(targetTipo)) {
+                    throw new HttpsError('permission-denied', 'No puedes cambiar la clave de un administrador.');
+                }
+                if (isUser && !['usuario', 'zonal'].includes(targetTipo)) {
+                    throw new HttpsError('permission-denied', 'No tienes permisos para cambiar la clave de este tipo de usuario.');
+                }
+            }
         }
 
         try {
