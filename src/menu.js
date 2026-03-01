@@ -617,7 +617,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Load logo as base64
             let logoBase64 = null;
             try {
-                const resp = await fetch('/imagenes/logo.webp');
+                const resp = await fetch(`${import.meta.env.BASE_URL}imagenes/logo.webp`);
                 const blob = await resp.blob();
                 logoBase64 = await new Promise((resolve) => {
                     const reader = new FileReader();
