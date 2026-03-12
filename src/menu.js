@@ -61,6 +61,32 @@ document.addEventListener('DOMContentLoaded', () => {
     let rawData = [];
     let currentView = 'dashboard'; // 'dashboard' or 'reportes'
 
+    // --- Peru Timezone Helpers ---
+    /**
+     * Returns a YYYY-MM-DD string for the current date in Peru (America/Lima)
+     * @param {number} offset - Days to add/subtract
+     */
+    const getPeruISO = (offset = 0) => {
+        const d = new Date();
+        d.setDate(d.getDate() + offset);
+        return new Intl.DateTimeFormat('en-CA', { 
+            timeZone: 'America/Lima', 
+            year: 'numeric', 
+            month: '2-digit', 
+            day: '2-digit' 
+        }).format(d);
+    };
+
+    /**
+     * Converts a YYYY-MM-DD string to a Date object at start/end of day in Peru (UTC-5)
+     */
+    const parsePeruDate = (dateStr, startOfDay = true) => {
+        if (!dateStr) return null;
+        const time = startOfDay ? '00:00:00' : '23:59:59';
+        // Peru is UTC-5
+        return new Date(`${dateStr}T${time}-05:00`);
+    };
+
     // --- Sidebar Logic ---
     sidebarToggle.addEventListener('click', () => {
         sidebar.classList.toggle('collapsed');
@@ -213,6 +239,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         estado: d.estado || 'Pendiente'
                     };
                 });
+
+                // Set default dates: Today and Yesterday (Peru Time)
+                dateStart.value = getPeruISO(-1); // Yesterday
+                dateEnd.value = getPeruISO(0);    // Today
 
                 populateFilters();
                 refreshDashboard();
@@ -422,16 +452,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getFilteredData() {
-        const startDate = dateStart.value ? new Date(dateStart.value) : null;
-        let endDate = dateEnd.value ? new Date(dateEnd.value) : null;
-        if (endDate) endDate.setHours(23, 59, 59);
+        // Use Peru-aware parsing for the filter inputs
+        const startDate = dateStart.value ? parsePeruDate(dateStart.value, true) : null;
+        const endDate = dateEnd.value ? parsePeruDate(dateEnd.value, false) : null;
 
         return rawData.filter(item => {
-            if (startDate && item.date && item.date < startDate) return false;
-            if (endDate && item.date && item.date > endDate) return false;
+            if (!item.date) return false;
+            
+            // Compare timestamps
+            if (startDate && item.date < startDate) return false;
+            if (endDate && item.date > endDate) return false;
+            
             if (filterClient.value && item.cliente !== filterClient.value) return false;
             if (filterUnit.value && item.unidad !== filterUnit.value) return false;
-            if (filterUser.value && item.userName !== filterUser.value) return false; // User Filter
+            if (filterUser.value && item.userName !== filterUser.value) return false; 
             return true;
         });
     }
