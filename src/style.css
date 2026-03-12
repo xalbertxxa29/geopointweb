@@ -23,6 +23,9 @@
     --text-dim: #6b8ba4;
     --glass-bg: rgba(4, 16, 42, 0.65);
     --glass-border: rgba(0, 212, 255, 0.18);
+    --neon-green: #39FF14;
+    --neon-green-dim: rgba(57, 255, 20, 0.12);
+    --neon-green-glow: rgba(57, 255, 20, 0.45);
     --sidebar-w: 260px;
     --header-h: 68px;
 }
@@ -737,6 +740,41 @@ body {
     color: var(--accent);
     border-color: var(--accent);
     box-shadow: 0 0 10px rgba(255, 23, 68, 0.3);
+}
+
+/* ─── EXCEL EXPORT BUTTON ───────────────────────────────────── */
+.excel-btn {
+    background: var(--neon-green-dim) !important;
+    border: 1px solid var(--neon-green) !important;
+    color: var(--neon-green) !important;
+    padding: 6px 14px !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    font-size: 0.8rem !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    cursor: pointer !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    box-shadow: 0 0 10px var(--neon-green-dim) !important;
+    width: auto !important;
+    height: auto !important;
+    font-family: 'Inter', sans-serif !important;
+}
+
+.excel-btn i {
+    font-size: 1.1rem !important;
+}
+
+.excel-btn:hover {
+    background: var(--neon-green) !important;
+    color: #020817 !important;
+    box-shadow: 0 0 20px var(--neon-green-glow) !important;
+    transform: translateY(-2px) !important;
+}
+
+.excel-btn:active {
+    transform: translateY(0) !important;
 }
 
 /* ─── PAGINATION ─────────────────────────────────────────────── */

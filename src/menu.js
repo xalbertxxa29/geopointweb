@@ -1,4 +1,4 @@
-﻿import { auth, db } from './firebase-config';
+import { auth, db } from './firebase-config';
 import { onAuthStateChanged, signOut, sendPasswordResetEmail } from "firebase/auth";
 import { collection, getDocs, doc, updateDoc, deleteDoc, getDoc, setDoc, serverTimestamp, query, orderBy, limit, addDoc } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
@@ -12,6 +12,8 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 
 
 // Register datalabels globally (used in all charts)
@@ -251,6 +253,109 @@ document.addEventListener('DOMContentLoaded', () => {
         showLoader('Aplicando filtros...');
         setTimeout(() => { refreshDashboard(); hideLoader(400); }, 100);
     });
+
+    const exportExcelBtn = document.getElementById('btn-export-excel');
+    if (exportExcelBtn) {
+        exportExcelBtn.addEventListener('click', async () => {
+            const data = getFilteredData();
+            if (data.length === 0) {
+                alert('No hay datos para exportar.');
+                return;
+            }
+            await generateExcelReport(data);
+        });
+    }
+
+    async function generateExcelReport(data) {
+        try {
+            showLoader('Generando Excel...');
+            const workbook = new ExcelJS.Workbook();
+            const worksheet = workbook.addWorksheet('Reporte de Visitas');
+
+            // Define columns
+            worksheet.columns = [
+                { header: 'FECHA', key: 'fecha', width: 15 },
+                { header: 'CLIENTE', key: 'cliente', width: 40 },
+                { header: 'UNIDAD', key: 'unidad', width: 30 },
+                { header: 'USUARIO', key: 'usuario', width: 25 },
+                { header: 'TAREA', key: 'tarea', width: 40 },
+                { header: 'ESTADÍA', key: 'estadia', width: 15 },
+                { header: 'ESTADO', key: 'estado', width: 15 }
+            ];
+
+            // Style headers
+            const headerRow = worksheet.getRow(1);
+            headerRow.eachCell((cell) => {
+                cell.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: 'FFC41E3A' } // Lido Red / Rojo Liderman
+                };
+                cell.font = {
+                    bold: true,
+                    color: { argb: 'FFFFFFFF' },
+                    size: 12
+                };
+                cell.alignment = { vertical: 'middle', horizontal: 'center' };
+                cell.border = {
+                    top: { style: 'thin' },
+                    left: { style: 'thin' },
+                    bottom: { style: 'thin' },
+                    right: { style: 'thin' }
+                };
+            });
+            headerRow.height = 25;
+
+            // Add data
+            data.forEach(item => {
+                const row = worksheet.addRow({
+                    fecha: item.date ? item.date.toLocaleDateString('es-PE') : 'N/A',
+                    cliente: item.cliente,
+                    unidad: item.unidad,
+                    usuario: item.userName,
+                    tarea: item.descripcion,
+                    estadia: item.tiempoEstadia,
+                    estado: item.estado
+                });
+
+                // Style data cells
+                row.eachCell((cell) => {
+                    cell.alignment = { vertical: 'middle' };
+                    cell.border = {
+                        top: { style: 'thin' },
+                        left: { style: 'thin' },
+                        bottom: { style: 'thin' },
+                        right: { style: 'thin' }
+                    };
+                });
+            });
+
+            // Alternate row colors
+            worksheet.eachRow((row, rowNumber) => {
+                if (rowNumber > 1 && rowNumber % 2 === 0) {
+                    row.eachCell(cell => {
+                        cell.fill = {
+                            type: 'pattern',
+                            pattern: 'solid',
+                            fgColor: { argb: 'FFF5F5F5' }
+                        };
+                    });
+                }
+            });
+
+            // Write and save
+            const buffer = await workbook.xlsx.writeBuffer();
+            const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const dateStr = new Date().toISOString().split('T')[0];
+            saveAs(blob, `Reporte_Zonal_${dateStr}.xlsx`);
+            
+            hideLoader(300);
+        } catch (err) {
+            console.error('Excel Export Error:', err);
+            hideLoader();
+            alert('Error al generar el Excel: ' + err.message);
+        }
+    }
 
     clearBtn.addEventListener('click', () => {
         showLoader('Limpiando filtros...');

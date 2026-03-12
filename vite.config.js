@@ -10,6 +10,10 @@ export default defineConfig(({ command }) => ({
     // Change 'geopointweb' to whatever you name your GitHub repository
     base: command === 'build' ? '/geopointweb/' : '/',
 
+    server: {
+        port: 4015,
+    },
+
     build: {
         outDir: 'dist',
         rollupOptions: {
