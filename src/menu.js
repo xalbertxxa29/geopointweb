@@ -340,10 +340,10 @@ document.addEventListener('DOMContentLoaded', () => {
             data.forEach(item => {
                 const row = worksheet.addRow({
                     fecha: item.date ? item.date.toLocaleDateString('es-PE') : 'N/A',
-                    cliente: item.cliente,
-                    unidad: item.unidad,
-                    usuario: item.userName,
-                    tarea: item.descripcion,
+                    cliente: (item.cliente || '').toUpperCase(),
+                    unidad: (item.unidad || '').toUpperCase(),
+                    usuario: (item.userName || '').toUpperCase(),
+                    tarea: (item.descripcion || '').toUpperCase(),
                     estadia: item.tiempoEstadia,
                     estado: item.estado
                 });
@@ -530,10 +530,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>${row.date ? row.date.toLocaleDateString('es-PE') : 'N/A'}</td>
-                    <td style="font-weight:600;color:#e8f4ff;">${row.cliente}</td>
-                    <td>${row.unidad}</td>
-                    <td><i class='bx bx-user' style="margin-right:5px;color:var(--primary);vertical-align:middle;"></i>${row.userName}</td>
-                    <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${row.descripcion}">${row.descripcion}</td>
+                    <td style="font-weight:600;color:#e8f4ff;">${(row.cliente || '').toUpperCase()}</td>
+                    <td>${(row.unidad || '').toUpperCase()}</td>
+                    <td><i class='bx bx-user' style="margin-right:5px;color:var(--primary);vertical-align:middle;"></i>${(row.userName || '').toUpperCase()}</td>
+                    <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(row.descripcion || '').toUpperCase()}">${(row.descripcion || '').toUpperCase()}</td>
                     <td style="color:var(--primary);font-family:monospace;">${row.tiempoEstadia}</td>
                     <td><span style="color:${statusColor};border:1px solid ${statusColor};padding:2px 10px;border-radius:20px;font-size:.72rem;letter-spacing:.5px;white-space:nowrap;">${row.estado}</span></td>
                 `;
@@ -659,10 +659,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 tr.innerHTML = `
                     <td>${row.date ? row.date.toLocaleDateString('es-PE') : 'N/A'}</td>
-                    <td style="font-weight: 600; color: #fff;">${row.cliente}</td>
-                    <td>${row.unidad}</td>
-                    <td><i class='bx bx-user' style="margin-right:4px;color:var(--primary);vertical-align:middle;"></i>${row.userName}</td>
-                    <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${row.descripcion}">${row.descripcion}</td>
+                    <td style="font-weight: 600; color: #fff;">${(row.cliente || '').toUpperCase()}</td>
+                    <td>${(row.unidad || '').toUpperCase()}</td>
+                    <td><i class='bx bx-user' style="margin-right:4px;color:var(--primary);vertical-align:middle;"></i>${(row.userName || '').toUpperCase()}</td>
+                    <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(row.descripcion || '').toUpperCase()}">${(row.descripcion || '').toUpperCase()}</td>
                     <td style="color: var(--primary); font-family: monospace;">${row.tiempoEstadia}</td>
                     <td><span style="color:${statusColor}; border:1px solid ${statusColor}; padding:2px 10px; border-radius:20px; font-size:.72rem; letter-spacing:.5px; white-space:nowrap;">${row.estado}</span></td>
                     <td class="action-cell">
