@@ -58,3 +58,58 @@ export const NEON_PALETTE = [
     '#ff9100', // Orange
     '#00b0ff', // Light Blue
 ];
+/**
+ * Formats a Date object or Firestore Timestamp to dd/mm/yyyy hh:mm:ss (Peru Time)
+ * @param {Date|Object} input 
+ * @returns {string}
+ */
+export function formatDate(input) {
+    if (!input) return 'N/A';
+    
+    let d = input;
+    // Handle Firestore Timestamp
+    if (input && typeof input.toDate === 'function') {
+        d = input.toDate();
+    } else if (!(input instanceof Date)) {
+        d = new Date(input);
+    }
+    
+    if (isNaN(d.getTime())) return 'N/A';
+    
+    // Explicitly use America/Lima (Peru) timezone
+    const formatter = new Intl.DateTimeFormat('es-PE', {
+        timeZone: 'America/Lima',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    });
+
+    const parts = formatter.formatToParts(d);
+    const getPart = (type) => parts.find(p => p.type === type).value;
+
+    return `${getPart('day')}/${getPart('month')}/${getPart('year')} ${getPart('hour')}:${getPart('minute')}:${getPart('second')}`;
+}
+
+/**
+ * Parses a string in format dd/mm/yyyy hh:mm:ss back to a Date object, 
+ * interpreting it as Peru Time (UTC-5).
+ * @param {string} dateStr 
+ * @returns {Date|string}
+ */
+export function parseDate(dateStr) {
+    if (typeof dateStr !== 'string') return dateStr;
+    const regex = /^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2}):(\d{2})$/;
+    const match = dateStr.match(regex);
+    if (match) {
+        const [_, day, month, year, hours, minutes, seconds] = match;
+        // Peru is UTC-5 (no DST)
+        const isoStr = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}:${seconds.padStart(2, '0')}-05:00`;
+        const d = new Date(isoStr);
+        if (!isNaN(d.getTime())) return d;
+    }
+    return dateStr;
+}

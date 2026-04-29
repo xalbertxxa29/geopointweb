@@ -7,9 +7,13 @@ service cloud.firestore {
     function isAuthenticated() {
       return request.auth != null;
     }
+    
+    match /mail_queue/{id} {
+      allow create: if request.auth != null;
+      allow read: if false; // Por seguridad, nadie debe leer la cola de correos desde la app
+    }
 
     function callerUsername() {
-      // Normalizamos a minúsculas para evitar errores de permisos por casing
       return request.auth.token.email.split('@')[0].lower();
     }
 
@@ -20,11 +24,12 @@ service cloud.firestore {
     }
 
     // ── tareas (incident reports) ─────────────────────────────────────────
-    // Fusionando: Lectura/Creación para autenticados, Modificación para admin
     match /tareas/{tareaId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
-      allow update, delete: if isAdmin();
+      // MODIFICACIÓN: Permitimos 'update' a usuarios autenticados para que puedan finalizar visitas
+      allow update: if isAuthenticated(); 
+      allow delete: if isAdmin();
 
       // Sub-colecciones (actividades, fotos, etc.)
       match /{subCol}/{docId} {
@@ -33,14 +38,12 @@ service cloud.firestore {
     }
 
     // ── usuarios ──────────────────────────────────────────────────────────
-    // Los usuarios ven su propio perfil, admins ven/modifican todo
     match /usuarios/{userId} {
       allow read: if isAuthenticated() && (callerUsername() == userId || isAdmin());
       allow write: if isAdmin();
     }
 
     // ── CLIENTES (unit catalog) ───────────────────────────────────────────
-    // Respetando el PRIMER SET: Mantener acceso abierto para no romper el flujo actual
     match /CLIENTES/{clienteId} {
       allow read, write: if true;
       match /UNIDADES/{unidadId} {
@@ -48,8 +51,12 @@ service cloud.firestore {
       }
     }
 
+    // ── CLIENTE (Nueva colección singular) ─────────────────────────────
+    match /CLIENTE/{document=**} {
+      allow read, write: if true;
+    }
+
     // ── logs (auditoría) ────────────────────────────────────────────────
-    // Cualquier usuario logueado crea logs, solo admin los lee
     match /logs/{logId} {
       allow create: if isAuthenticated();
       allow read: if isAdmin();

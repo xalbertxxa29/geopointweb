@@ -1,0 +1,12 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "tareas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "fecha", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

@@ -1,9 +1,9 @@
 import { auth, db } from './firebase-config';
 import { onAuthStateChanged, signOut, sendPasswordResetEmail } from "firebase/auth";
-import { collection, getDocs, doc, updateDoc, deleteDoc, getDoc, setDoc, serverTimestamp, query, orderBy, limit, addDoc } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc, deleteDoc, getDoc, setDoc, serverTimestamp, query, orderBy, limit, addDoc, where } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { showLoader, hideLoader } from './loader.js';
-import { subtractDuration, normalizeUsername } from './utils.js';
+import { subtractDuration, normalizeUsername, formatDate } from './utils.js';
 
 
 import Chart from 'chart.js/auto';
@@ -33,16 +33,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const tableSection = document.getElementById('table-section');
     const loadingDiv = document.getElementById('loading');
     const logoutBtn = document.getElementById('logout-btn');
-    const tableBody = document.getElementById('table-body');
 
     // Filter Controls
     const dateStart = document.getElementById('date-start');
     const dateEnd = document.getElementById('date-end');
     const filterClient = document.getElementById('filter-client');
     const filterUnit = document.getElementById('filter-unit');
-    const filterUser = document.getElementById('filter-user'); // New User Filter
+    const filterUser = document.getElementById('filter-user'); 
+    const filterMacro = document.getElementById('filter-macro');
+    const filterZona = document.getElementById('filter-zona');
     const applyBtn = document.getElementById('apply-filters');
     const clearBtn = document.getElementById('clear-filters');
+    const pillsContainer = document.getElementById('active-filters-pills');
 
     // View References
     const dashboardView = document.getElementById('indicators-grid');
@@ -54,12 +56,33 @@ document.addEventListener('DOMContentLoaded', () => {
     let charts = {
         client: null,
         unit: null,
-        user: null
+        user: null,
+        trend: null,
+        status: null,
+        macrozona: null,
+        weekday: null,
+        jurisdiccion: null,
+        gapUnits: null,
+        operMacro: null,
+        covMacro: null,
+        covClient: null,
+        usage: null
     };
 
     // Data Store
     let rawData = [];
-    let currentView = 'dashboard'; // 'dashboard' or 'reportes'
+    let currentView = 'dashboard';
+
+    // Intelligent Filter State
+    let filtersState = {
+        client: '',
+        unit: '',
+        user: '',
+        macro: '',
+        zona: '',
+        status: '', // For compliance status filtering
+        jurisdiccion: ''
+    };
 
     // --- Peru Timezone Helpers ---
     /**
@@ -121,9 +144,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (linkText === 'Dashboard') {
                 currentView = 'dashboard';
-                dashboardView.style.display = 'grid';
-                tableSection.style.display = 'block';
+                dashboardView.style.display = 'block';
                 filterSection.style.display = 'block';
+                refreshDashboard();
             } else if (linkText === 'Reportes') {
                 currentView = 'reportes';
                 reportsView.style.display = 'block';
@@ -211,8 +234,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     // If somehow on audit view, force redirect to dashboard
                     if (currentView === 'audit') {
                         currentView = 'dashboard';
-                        dashboardView.style.display = 'grid';
-                        tableSection.style.display = 'block';
+                        dashboardView.style.display = 'block';
+                        tableSection.style.display = 'none';
                         reportsView.style.display = 'none';
                         filterSection.style.display = 'block';
                         document.getElementById('units-view').style.display = 'none';
@@ -223,11 +246,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // ── Continue with data load if authorized ──────────────────
                 showLoader('Sincronizando datos...');
-                const snapshot = await getDocs(collection(db, "tareas"));
-                rawData = snapshot.docs.map(doc => {
-                    const d = doc.data();
+
+                // Query with date range to avoid loading entire collection
+                const defaultStart = getPeruISO(-1);
+                const defaultEnd = getPeruISO(0);
+                dateStart.value = defaultStart;
+                dateEnd.value = defaultEnd;
+
+                const startISO = `${defaultStart}T00:00:00-05:00`;
+                const endISO = `${defaultEnd}T23:59:59-05:00`;
+                const tareasQuery = query(
+                    collection(db, "tareas"),
+                    where("fecha", ">=", startISO),
+                    where("fecha", "<=", endISO)
+                );
+                const snapshot = await getDocs(tareasQuery);
+                rawData = snapshot.docs.map(docSnap => {
+                    const d = docSnap.data();
                     return {
-                        id: doc.id,
+                        id: docSnap.id,
                         ...d,
                         // Normalization
                         userName: normalizeUsername(d.userName || d.userEmail),
@@ -236,13 +273,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         unidad: d.unidad || 'General',
                         descripcion: d.descripcion || '-',
                         tiempoEstadia: d.tiempoEstadia || '-',
-                        estado: d.estado || 'Pendiente'
+                        estado: d.estado || 'Pendiente',
+                        macrozona: d.macrozona || '',
+                        zona: d.zona || '',
+                        departamento: d.departamento || '',
+                        cumpliofinalizacion: d.cumpliofinalizacion || '',
                     };
                 });
-
-                // Set default dates: Today and Yesterday (Peru Time)
-                dateStart.value = getPeruISO(-1); // Yesterday
-                dateEnd.value = getPeruISO(0);    // Today
 
                 populateFilters();
                 refreshDashboard();
@@ -250,21 +287,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Reveal UI (Default Dashboard)
                 loadingDiv.style.display = 'none';
                 filterSection.style.display = 'block';
-                dashboardView.style.display = 'grid';
-                tableSection.style.display = 'block';
+                dashboardView.style.display = 'block';
+                tableSection.style.display = 'none';
                 reportsView.style.display = 'none';
-
-                hideLoader(300);
 
             } catch (err) {
                 if (import.meta.env.DEV) console.error('[menu] Data Load Error:', err);
-                hideLoader();
                 const isOffline = err.message?.includes('offline') || err.code === 'unavailable';
                 loadingDiv.innerHTML = `
                     <i class='bx bxs-error-circle'></i> 
                     ${isOffline ? 'Error de conexión (Offline). Reintenta en unos segundos.' : 'Error al cargar datos.'}
                     <br><button onclick="window.location.reload()" class="uv-btn uv-btn-primary" style="margin-top:10px; padding: 5px 15px; font-size: 0.8rem;">Recargar Página</button>
                 `;
+            } finally {
+                hideLoader(300);
             }
         }
     });
@@ -279,9 +315,44 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Filters ---
-    applyBtn.addEventListener('click', () => {
-        showLoader('Aplicando filtros...');
-        setTimeout(() => { refreshDashboard(); hideLoader(400); }, 100);
+    applyBtn.addEventListener('click', async () => {
+        showLoader('Consultando datos...');
+        try {
+            const sDate = dateStart.value || getPeruISO(-1);
+            const eDate = dateEnd.value || getPeruISO(0);
+            const sISO = `${sDate}T00:00:00-05:00`;
+            const eISO = `${eDate}T23:59:59-05:00`;
+            const q = query(
+                collection(db, "tareas"),
+                where("fecha", ">=", sISO),
+                where("fecha", "<=", eISO)
+            );
+            const snapshot = await getDocs(q);
+            rawData = snapshot.docs.map(docSnap => {
+                const d = docSnap.data();
+                return {
+                    id: docSnap.id,
+                    ...d,
+                    userName: normalizeUsername(d.userName || d.userEmail),
+                    date: d.fecha ? new Date(d.fecha) : null,
+                    cliente: d.cliente || 'Sin Asignar',
+                    unidad: d.unidad || 'General',
+                    descripcion: d.descripcion || '-',
+                    tiempoEstadia: d.tiempoEstadia || '-',
+                    estado: d.estado || 'Pendiente',
+                    macrozona: d.macrozona || '',
+                    zona: d.zona || '',
+                    departamento: d.departamento || '',
+                    cumpliofinalizacion: d.cumpliofinalizacion || '',
+                };
+            });
+            populateFilters();
+            refreshDashboard();
+        } catch (err) {
+            console.error('[menu] Filter query error:', err);
+        } finally {
+            hideLoader(300);
+        }
     });
 
     const exportExcelBtn = document.getElementById('btn-export-excel');
@@ -339,7 +410,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Add data
             data.forEach(item => {
                 const row = worksheet.addRow({
-                    fecha: item.date ? item.date.toLocaleDateString('es-PE') : 'N/A',
+                    fecha: formatDate(item.date),
                     cliente: item.cliente,
                     unidad: item.unidad,
                     usuario: item.userName,
@@ -390,14 +461,16 @@ document.addEventListener('DOMContentLoaded', () => {
     clearBtn.addEventListener('click', () => {
         showLoader('Limpiando filtros...');
 
-        // Reset all inputs
+        filtersState = { client: '', unit: '', user: '', macro: '', zona: '', status: '', jurisdiccion: '' };
+
         dateStart.value = '';
         dateEnd.value = '';
         filterClient.value = '';
         filterUnit.value = '';
         filterUser.value = '';
+        filterMacro.value = '';
+        filterZona.value = '';
 
-        // Re-populate units to show all (resetting cascade)
         populateUnits('');
 
         setTimeout(() => {
@@ -407,201 +480,690 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function populateFilters() {
+        const macros = [...new Set(rawData.map(i => i.macrozona).filter(Boolean))].sort();
+        const zones = [...new Set(rawData.map(i => i.zona).filter(Boolean))].sort();
         const clients = [...new Set(rawData.map(i => i.cliente))].sort();
         const users = [...new Set(rawData.map(i => i.userName))].sort();
 
-        // ── Populate Clients ──────────────────────────────────────
-        clients.forEach(c => {
-            const opt = document.createElement('option');
-            opt.value = c; opt.textContent = c;
-            filterClient.appendChild(opt);
-        });
+        const updateSelect = (el, items, placeholder) => {
+            const prev = el.value;
+            el.innerHTML = `<option value="">${placeholder}</option>`;
+            items.forEach(item => {
+                const opt = document.createElement('option');
+                opt.value = item; opt.textContent = item;
+                el.appendChild(opt);
+            });
+            el.value = prev;
+        };
 
-        // ── Populate Users ────────────────────────────────────────
-        users.forEach(u => {
-            const opt = document.createElement('option');
-            opt.value = u; opt.textContent = u;
-            filterUser.appendChild(opt);
-        });
-
-        // ── Initial Unit population (all units) ───────────────────
+        updateSelect(filterMacro, macros, 'Todas');
+        updateSelect(filterZona, zones, 'Todas');
+        updateSelect(filterClient, clients, 'Todos los Clientes');
+        updateSelect(filterUser, users, 'Todos los Usuarios');
+        
         populateUnits('');
 
-        // ── Cascade: rebuild units when client changes ────────────
-        filterClient.addEventListener('change', () => {
-            populateUnits(filterClient.value);
-            filterUnit.value = ''; // reset unit selection
-        });
+        // Wire up change events to update filtersState
+        const wireFilter = (el, key) => {
+            el.addEventListener('change', () => {
+                filtersState[key] = el.value;
+                if (key === 'client') {
+                    populateUnits(el.value);
+                    filtersState.unit = '';
+                    filterUnit.value = '';
+                }
+                refreshDashboard();
+            });
+        };
+
+        wireFilter(filterMacro, 'macro');
+        wireFilter(filterZona, 'zona');
+        wireFilter(filterClient, 'client');
+        wireFilter(filterUnit, 'unit');
+        wireFilter(filterUser, 'user');
     }
 
     function populateUnits(selectedClient) {
-        // Keep only the default "Todas las Unidades" option
         filterUnit.innerHTML = '<option value="">Todas las Unidades</option>';
-
         const source = selectedClient
             ? rawData.filter(i => i.cliente === selectedClient)
             : rawData;
-
         const units = [...new Set(source.map(i => i.unidad))].sort();
-
         units.forEach(u => {
             const opt = document.createElement('option');
             opt.value = u; opt.textContent = u;
             filterUnit.appendChild(opt);
         });
+        filterUnit.value = filtersState.unit;
+    }
+
+    /**
+     * Centralized Drill-Down Handler
+     */
+    function handleDrillDown(key, value) {
+        if (!key || value === undefined) return;
+        
+        filtersState[key] = value;
+        
+        // Sync UI Elements
+        if (key === 'macro') filterMacro.value = value;
+        if (key === 'zona') filterZona.value = value;
+        if (key === 'client') {
+            filterClient.value = value;
+            populateUnits(value);
+        }
+        if (key === 'unit') filterUnit.value = value;
+        if (key === 'user') filterUser.value = value;
+        
+        refreshDashboard();
+        
+        // Visual feedback: briefly highlight the filter panel
+        filterSection.classList.add('highlight-flash');
+        setTimeout(() => filterSection.classList.remove('highlight-flash'), 1000);
+    }
+
+    function renderFilterPills() {
+        if (!pillsContainer) return;
+        pillsContainer.innerHTML = '';
+        
+        const labels = {
+            macro: 'Macrozona',
+            zona: 'Zona',
+            client: 'Cliente',
+            unit: 'Unidad',
+            user: 'Usuario',
+            status: 'Estado',
+            jurisdiccion: 'Jurisdicción'
+        };
+
+        Object.entries(filtersState).forEach(([key, val]) => {
+            if (val) {
+                const pill = document.createElement('div');
+                pill.className = 'filter-pill';
+                pill.innerHTML = `<span>${labels[key]}:</span> ${val} <i class='bx bx-x' data-key="${key}"></i>`;
+                pill.querySelector('i').onclick = () => {
+                    filtersState[key] = '';
+                    // Sync UI back
+                    const el = document.getElementById(`filter-${key === 'macro' ? 'macro' : key === 'client' ? 'client' : key === 'unit' ? 'unit' : key === 'user' ? 'user' : key}`);
+                    if (el) el.value = '';
+                    if (key === 'client') populateUnits('');
+                    refreshDashboard();
+                };
+                pillsContainer.appendChild(pill);
+            }
+        });
     }
 
     function getFilteredData() {
-        // Use Peru-aware parsing for the filter inputs
         const startDate = dateStart.value ? parsePeruDate(dateStart.value, true) : null;
         const endDate = dateEnd.value ? parsePeruDate(dateEnd.value, false) : null;
 
         return rawData.filter(item => {
             if (!item.date) return false;
             
-            // Compare timestamps
             if (startDate && item.date < startDate) return false;
             if (endDate && item.date > endDate) return false;
             
-            if (filterClient.value && item.cliente !== filterClient.value) return false;
-            if (filterUnit.value && item.unidad !== filterUnit.value) return false;
-            if (filterUser.value && item.userName !== filterUser.value) return false; 
+            if (filtersState.client && item.cliente !== filtersState.client) return false;
+            if (filtersState.unit && item.unidad !== filtersState.unit) return false;
+            if (filtersState.user && item.userName !== filtersState.user) return false;
+            if (filtersState.macro && (item.macrozona || '').toUpperCase() !== filtersState.macro.toUpperCase()) return false;
+            if (filtersState.zona && (item.zona || '').toUpperCase() !== filtersState.zona.toUpperCase()) return false;
+            
+            if (filtersState.status) {
+                const unitMetric = buildUnitMetrics([item])[0];
+                if (unitMetric && unitMetric.estado !== filtersState.status) return false;
+            }
+            
+            if (filtersState.jurisdiccion) {
+                const dept = (item.departamento || '').toUpperCase().trim();
+                const jur = dept === 'LIMA' ? 'LIMA' : 'PROVINCIA';
+                if (jur !== filtersState.jurisdiccion) return false;
+            }
+
             return true;
         });
     }
 
     function refreshDashboard() {
         const filtered = getFilteredData();
+        renderFilterPills();
 
         if (currentView === 'dashboard') {
-            // 2. Aggregate Data
-            const counts = {
-                clients: {},
-                units: {},
-                users: {}
-            };
-
-            filtered.forEach(item => {
-                counts.clients[item.cliente] = (counts.clients[item.cliente] || 0) + 1;
-                counts.units[item.unidad] = (counts.units[item.unidad] || 0) + 1;
-                counts.users[item.userName] = (counts.users[item.userName] || 0) + 1;
-            });
-
-            // 3. Update Visuals
-            updateCharts(counts);
-            updateTable(filtered);
+            const unitMetrics = buildUnitMetrics(filtered);
+            const usageData = buildUsageData(filtered);
+            renderKPIs(filtered, unitMetrics, usageData);
+            renderResumen(filtered, unitMetrics);
+            renderBrechas(filtered, unitMetrics);
+            renderOperativo(filtered);
+            renderCobertura(filtered, unitMetrics);
+            renderUso(usageData);
+            renderDetalle(filtered);
         } else if (currentView === 'reportes') {
             updateReportsTable(filtered);
         }
     }
 
-    // ─── Pagination state for Registro Detallado ────────────────
-    let tableCurrentPage = 1;
-    const TABLE_PAGE_SIZE = 10;
-    let tableDataCache = [];
+    // ── Dashboard Tabs ─────────────────────────────────────────
+    document.querySelectorAll('.dash-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.dash-tab').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            document.querySelectorAll('.dash-module').forEach(m => m.classList.remove('active'));
+            const mod = document.getElementById('mod-' + btn.dataset.tab);
+            if (mod) mod.classList.add('active');
+            setTimeout(() => Object.values(charts).forEach(c => { if (c && c.resize) c.resize(); }), 80);
+        });
+    });
 
-    function updateTable(data) {
-        tableDataCache = data;
-        tableCurrentPage = 1;
-        renderTablePage();
+    const trendModeEl = document.getElementById('trend-mode');
+    if (trendModeEl) trendModeEl.addEventListener('change', () => refreshDashboard());
+
+    const FONT = "'Orbitron', 'Inter', sans-serif";
+    const FONT_SM = "'Inter', sans-serif";
+    const TICK = '#4a7a9b';
+    const GRID_COLOR = 'rgba(0,212,255,0.07)';
+    const palette = [
+        'hsla(190, 100%, 50%, 0.8)', 'hsla(345, 100%, 50%, 0.8)', 'hsla(270, 100%, 65%, 0.8)',
+        'hsla(45,  100%, 55%, 0.8)', 'hsla(150, 100%, 50%, 0.8)', 'hsla(210, 100%, 60%, 0.8)',
+        'hsla(15,  100%, 55%, 0.8)', 'hsla(320, 100%, 60%, 0.8)', 'hsla(180, 100%, 40%, 0.8)',
+        'hsla(280, 100%, 15%, 0.8)',
+    ];
+    const anim = { duration: 800, easing: 'easeOutQuart' };
+
+    function parseStayMinutes(str) {
+        if (!str || str === '-') return 0;
+        const hMatch = str.match(/(\d+)\s*h/);
+        const mMatch = str.match(/(\d+)\s*m/);
+        return (hMatch ? parseInt(hMatch[1]) * 60 : 0) + (mMatch ? parseInt(mMatch[1]) : 0);
     }
 
-    function renderTablePage() {
-        const data = tableDataCache;
+    function buildUnitMetrics(data) {
+        const map = new Map();
+        data.forEach(r => {
+            // Use composite key: cliente + unidad to avoid merging same unit names from different clients
+            const cliente = (r.cliente || 'SIN ASIGNAR').toUpperCase();
+            const unidad = (r.unidad || '').toUpperCase();
+            const k = cliente + '|||' + unidad;
+            if (!unidad) return;
+            if (!map.has(k)) map.set(k, { unidad: unidad, cliente: cliente, departamento: '', macrozona: (r.macrozona || '').toUpperCase(), zona: (r.zona || '').toUpperCase(), meta: 4, visitas: 0, leaders: new Set() });
+            const u = map.get(k);
+            u.visitas += 1;
+            if (r.userName) u.leaders.add(r.userName);
+            if (!u.departamento && r.departamento) u.departamento = (r.departamento || '').toUpperCase();
+            if (!u.macrozona && r.macrozona) u.macrozona = (r.macrozona || '').toUpperCase();
+            if (!u.zona && r.zona) u.zona = (r.zona || '').toUpperCase();
+        });
+        const result = [];
+        map.forEach(u => {
+            u.leadersCount = u.leaders.size;
+            u.brecha = Math.max(0, u.meta - u.visitas);
+            u.percent = u.meta ? Math.round(u.visitas / u.meta * 100) : 0;
+            if (u.brecha <= 0) { u.estado = 'CUMPLE'; u.klass = 'color:#22c55e'; }
+            else if (u.brecha <= u.meta * 0.3) { u.estado = 'PARCIAL'; u.klass = 'color:#f59e0b'; }
+            else { u.estado = 'NO CUMPLE'; u.klass = 'color:#f43f5e'; }
+            result.push(u);
+        });
+        return result;
+    }
+
+    function buildUsageData(data) {
+        const byUser = new Map();
+        data.forEach(r => {
+            const l = r.userName;
+            if (!l) return;
+            if (!byUser.has(l)) byUser.set(l, { leader: l, visits: 0, daysSet: new Set(), last: '' });
+            const x = byUser.get(l);
+            x.visits += 1;
+            if (r.date) { const ds = r.date.toISOString().split('T')[0]; x.daysSet.add(ds); if (ds > x.last) x.last = ds; }
+        });
+        const result = [];
+        byUser.forEach(x => {
+            x.daysCount = x.daysSet.size;
+            const totalDays = new Set(data.filter(r => r.date).map(r => r.date.toISOString().split('T')[0])).size || 1;
+            const ratio = x.daysCount / totalDays;
+            if (ratio >= 0.5) x.status = 'Activo';
+            else if (ratio >= 0.2) x.status = 'Intermitente';
+            else x.status = 'Inactivo';
+            x.klass = x.status === 'Activo' ? 'color:#22c55e' : x.status === 'Intermitente' ? 'color:#f59e0b' : 'color:#f43f5e';
+            result.push(x);
+        });
+        return result.sort((a, b) => b.visits - a.visits);
+    }
+
+    function renderKPIs(data, unitMetrics, usageData) {
         const total = data.length;
-        const pages = Math.max(1, Math.ceil(total / TABLE_PAGE_SIZE));
-        const page = Math.min(tableCurrentPage, pages);
-        const start = (page - 1) * TABLE_PAGE_SIZE;
-        const slice = data.slice(start, start + TABLE_PAGE_SIZE);
+        const clients = new Set(data.map(d => d.cliente));
+        const units = new Set(data.map(d => d.unidad));
+        const leaders = new Set(data.map(d => d.userName));
+        const metCount = unitMetrics.filter(u => u.estado === 'CUMPLE').length;
+        const coveragePct = unitMetrics.length ? Math.round(metCount / unitMetrics.length * 100) : 0;
+        const gapUnits = unitMetrics.filter(u => u.estado !== 'CUMPLE').length;
+        const activeUsers = usageData.filter(u => u.status === 'Activo').length;
+        const usagePct = usageData.length ? Math.round(activeUsers / usageData.length * 100) : 0;
+        const stayArr = data.map(d => parseStayMinutes(d.tiempoEstadia));
+        const avgStay = stayArr.length ? Math.round(stayArr.reduce((a, b) => a + b, 0) / stayArr.length) : 0;
 
-        // ── Rows ──────────────────────────────────────────────────
-        tableBody.innerHTML = '';
+        document.getElementById('kpi-visits').textContent = total.toLocaleString('es-PE');
+        document.getElementById('kpi-clients').textContent = clients.size.toLocaleString('es-PE');
+        document.getElementById('kpi-units').textContent = units.size.toLocaleString('es-PE');
+        document.getElementById('kpi-leaders').textContent = leaders.size.toLocaleString('es-PE');
+        document.getElementById('kpi-coverage').textContent = coveragePct + '%';
+        document.getElementById('kpi-coverage-sub').textContent = metCount + ' unidades cumplen';
+        document.getElementById('kpi-gap').textContent = gapUnits.toLocaleString('es-PE');
+        document.getElementById('kpi-usage').textContent = usagePct + '%';
+        document.getElementById('kpi-stay').textContent = avgStay >= 60 ? Math.floor(avgStay / 60) + 'h ' + (avgStay % 60) + 'm' : avgStay + 'm';
+    }
 
-        if (total === 0) {
-            tableBody.innerHTML = `
-                <tr><td colspan="7" style="text-align:center;padding:28px;color:var(--text-dim);">
-                    <i class='bx bx-search-alt' style="font-size:1.5rem;display:block;margin-bottom:8px;"></i>
-                    No se encontraron registros
-                </td></tr>`;
-        } else {
-            slice.forEach(row => {
-                const isOk = row.estado && row.estado.toUpperCase().includes('COMPLET');
-                const statusColor = isOk ? '#00d4ff' : '#ff1744';
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${row.date ? row.date.toLocaleDateString('es-PE') : 'N/A'}</td>
-                    <td style="font-weight:600;color:#e8f4ff;">${row.cliente}</td>
-                    <td>${row.unidad}</td>
-                    <td><i class='bx bx-user' style="margin-right:5px;color:var(--primary);vertical-align:middle;"></i>${row.userName}</td>
-                    <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${row.descripcion}">${row.descripcion}</td>
-                    <td style="color:var(--primary);font-family:monospace;">${row.tiempoEstadia}</td>
-                    <td><span style="color:${statusColor};border:1px solid ${statusColor};padding:2px 10px;border-radius:20px;font-size:.72rem;letter-spacing:.5px;white-space:nowrap;">${row.estado}</span></td>
-                `;
-                tableBody.appendChild(tr);
-            });
-        }
+    function renderResumen(data, unitMetrics) {
+        const trendMode = trendModeEl ? trendModeEl.value : 'daily';
+        const byDay = new Map();
+        data.forEach(r => { if (!r.date) return; const d = r.date.toISOString().split('T')[0]; byDay.set(d, (byDay.get(d) || 0) + 1); });
+        const trend = Array.from(byDay.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+        let tLabels = trend.map(x => { const d = new Date(x[0] + 'T12:00:00'); return d.toLocaleDateString('es-PE', { month: 'short', day: 'numeric' }); });
+        let tValues = trend.map(x => x[1]);
+        if (trendMode === 'cumulative') { let acc = 0; tValues = tValues.map(v => acc += v); }
 
-        // ── Pagination controls ───────────────────────────────────
-        let pager = document.getElementById('table-pager');
-        if (!pager) {
-            pager = document.createElement('div');
-            pager.id = 'table-pager';
-            pager.className = 'table-pager';
-            // Insert after the table-responsive div inside #table-section
-            const tableSection = document.getElementById('table-section');
-            tableSection.appendChild(pager);
-        }
+        if (charts.trend) charts.trend.destroy();
+        charts.trend = new Chart(document.getElementById('chart-trend'), {
+            type: 'line',
+            data: { labels: tLabels, datasets: [{ label: trendMode === 'daily' ? 'Visitas' : 'Acumulado', data: tValues, borderColor: '#67e8f9', backgroundColor: 'rgba(103,232,249,.14)', fill: true, tension: .28 }] },
+            options: { responsive: true, maintainAspectRatio: false, animation: anim, plugins: { legend: { labels: { color: '#e2e8f0' } }, datalabels: { display: false } }, scales: { x: { ticks: { color: TICK, maxRotation: 45 } }, y: { ticks: { color: TICK } } } }
+        });
 
-        if (total === 0) { pager.innerHTML = ''; return; }
-
-        const btn = (label, disabled, action, icon = '') => `
-            <button class="pager-btn${disabled ? ' disabled' : ''}" ${disabled ? 'disabled' : `onclick="${action}"`}>
-                ${icon ? `<i class='bx ${icon}'></i>` : label}
-            </button>`;
-
-        // generate page number buttons (max 5 visible)
-        let pageButtons = '';
-        const range = 2; // pages on each side of current
-        for (let p = 1; p <= pages; p++) {
-            if (p === 1 || p === pages || (p >= page - range && p <= page + range)) {
-                pageButtons += `<button class="pager-btn${p === page ? ' active' : ''}" onclick="window._tablePage(${p})">${p}</button>`;
-            } else if (p === page - range - 1 || p === page + range + 1) {
-                pageButtons += `<span class="pager-ellipsis">…</span>`;
+        const st = { 'CUMPLE': unitMetrics.filter(u => u.estado === 'CUMPLE').length, 'PARCIAL': unitMetrics.filter(u => u.estado === 'PARCIAL').length, 'NO CUMPLE': unitMetrics.filter(u => u.estado === 'NO CUMPLE').length };
+        if (charts.status) charts.status.destroy();
+        charts.status = new Chart(document.getElementById('chart-status'), {
+            type: 'doughnut',
+            data: { labels: Object.keys(st), datasets: [{ data: Object.values(st), backgroundColor: ['#22c55e', '#f59e0b', '#f43f5e'], borderColor: '#020b1f', borderWidth: 3 }] },
+            options: { 
+                responsive: true, maintainAspectRatio: false, cutout: '55%', animation: anim, 
+                plugins: { legend: { position: 'bottom', labels: { color: '#8ab4cc', usePointStyle: true } }, datalabels: { color: '#fff', font: { family: FONT, size: 10, weight: '700' }, formatter: (val) => { const t = Object.values(st).reduce((a, b) => a + b, 0); return t ? Math.round(val / t * 100) + '%' : ''; } } },
+                onClick: (e, elements) => {
+                    if (elements.length > 0) {
+                        const idx = elements[0].index;
+                        const label = Object.keys(st)[idx];
+                        handleDrillDown('status', label);
+                    }
+                }
             }
-        }
+        });
 
-        pager.innerHTML = `
-            <div class="pager-info">
-                Mostrando <strong>${start + 1}–${Math.min(start + TABLE_PAGE_SIZE, total)}</strong> de <strong>${total}</strong> registros
-            </div>
-            <div class="pager-controls">
-                ${btn('', page <= 1, '', 'bx-first-page')}
-                ${btn('', page <= 1, '', 'bx-chevron-left')}
-                ${pageButtons}
-                ${btn('', page >= pages, '', 'bx-chevron-right')}
-                ${btn('', page >= pages, '', 'bx-last-page')}
-            </div>`;
+        const macroMap = {};
+        data.forEach(r => { if (r.macrozona) macroMap[r.macrozona] = (macroMap[r.macrozona] || 0) + 1; });
+        const mLabels = Object.keys(macroMap).sort((a,b) => macroMap[b] - macroMap[a]).slice(0, 10);
+        const mValues = mLabels.map(l => macroMap[l]);
 
-        // Wire up icon buttons (since onclick='' with disabled won't work for first/last)
-        const btns = pager.querySelectorAll('.pager-btn:not(.active):not(.disabled)');
-        const icons = ['bx-first-page', 'bx-chevron-left', 'bx-chevron-right', 'bx-last-page'];
-        const actions = [1, page - 1, page + 1, pages];
-        btns.forEach((b, i) => {
-            const icon = b.querySelector('i');
-            if (!icon) return;
-            const idx = icons.indexOf(icon.classList[1]);
-            if (idx >= 0) b.onclick = () => window._tablePage(actions[idx]);
+        if (charts.macrozona) charts.macrozona.destroy();
+        charts.macrozona = new Chart(document.getElementById('chart-macrozona'), {
+            type: 'bar',
+            data: { labels: mLabels, datasets: [{ label: 'Visitas', data: mValues, backgroundColor: '#818cf8' }] },
+            options: { 
+                responsive: true, maintainAspectRatio: false, animation: anim, 
+                plugins: { legend: { labels: { color: '#e2e8f0' } }, datalabels: { anchor: 'end', align: 'top', color: '#e2e8f0', font: { family: FONT, size: 10, weight: '600' } } }, 
+                scales: { x: { ticks: { color: TICK, maxRotation: 35, font: { size: 9 } } }, y: { ticks: { color: TICK } } },
+                onClick: (e, elements) => {
+                    if (elements.length > 0) {
+                        const idx = elements[0].index;
+                        handleDrillDown('macro', mLabels[idx]);
+                    }
+                }
+            }
+        });
+
+        const wkOrder = ['Dom', 'Lun', 'Mar', 'Mi\u00e9', 'Jue', 'Vie', 'S\u00e1b'];
+        const wkCount = Object.fromEntries(wkOrder.map(d => [d, 0]));
+        data.forEach(r => { if (r.date) wkCount[wkOrder[r.date.getDay()]] += 1; });
+        if (charts.weekday) charts.weekday.destroy();
+        charts.weekday = new Chart(document.getElementById('chart-weekday'), {
+            type: 'bar',
+            data: { labels: wkOrder, datasets: [{ label: 'Visitas', data: wkOrder.map(k => wkCount[k]), backgroundColor: '#2dd4bf' }] },
+            options: { responsive: true, maintainAspectRatio: false, animation: anim, plugins: { legend: { labels: { color: '#e2e8f0' } }, datalabels: { anchor: 'end', align: 'top', color: '#e2e8f0', font: { family: FONT, size: 10, weight: '600' } } }, scales: { x: { ticks: { color: TICK } }, y: { ticks: { color: TICK } } } }
+        });
+
+        const jurCount = { 'LIMA': 0, 'PROVINCIA': 0 };
+        data.forEach(r => {
+            const dept = (r.departamento || '').toUpperCase().trim();
+            const key = dept === 'LIMA' ? 'LIMA' : 'PROVINCIA';
+            jurCount[key] += 1;
+        });
+        const jurLabels = ['LIMA', 'PROVINCIA'];
+        const jurValues = jurLabels.map(k => jurCount[k]);
+        if (charts.jurisdiccion) charts.jurisdiccion.destroy();
+        charts.jurisdiccion = new Chart(document.getElementById('chart-jurisdiccion'), {
+            type: 'bar',
+            data: { labels: jurLabels, datasets: [{ label: 'Visitas', data: jurValues, backgroundColor: ['#22d3ee', '#14b8a6'] }] },
+            options: { 
+                responsive: true, maintainAspectRatio: false, animation: anim, 
+                plugins: { legend: { labels: { color: '#e2e8f0' } }, datalabels: { anchor: 'end', align: 'top', color: '#e2e8f0', font: { family: FONT, size: 12, weight: '700' } } }, 
+                scales: { x: { ticks: { color: TICK } }, y: { ticks: { color: TICK } } },
+                onClick: (e, elements) => {
+                    if (elements.length > 0) {
+                        const idx = elements[0].index;
+                        handleDrillDown('jurisdiccion', jurLabels[idx]);
+                    }
+                }
+            }
         });
     }
 
-    // Global helper for onclick in innerHTML pagination buttons
-    window._tablePage = (p) => {
-        tableCurrentPage = p;
-        renderTablePage();
-    };
+    function renderBrechas(data, unitMetrics) {
+        // Stable sort: primary by brecha (desc), secondary by unidad (asc)
+        const gaps = unitMetrics.filter(u => u.brecha > 0).sort((a, b) => {
+            if (b.brecha !== a.brecha) return b.brecha - a.brecha;
+            return a.unidad.localeCompare(b.unidad);
+        }).slice(0, 12);
+        if (charts.gapUnits) charts.gapUnits.destroy();
+        charts.gapUnits = new Chart(document.getElementById('chart-gap-units'), {
+            type: 'bar',
+            data: { labels: gaps.map(x => x.unidad), datasets: [{ label: 'Brecha', data: gaps.map(x => x.brecha), backgroundColor: '#f43f5e' }] },
+            options: { 
+                indexAxis: 'y', responsive: true, maintainAspectRatio: false, animation: anim, 
+                plugins: { legend: { labels: { color: '#e2e8f0' } }, datalabels: { anchor: 'end', align: 'end', color: '#f43f5e', font: { family: FONT, size: 10, weight: '600' } } }, 
+                scales: { x: { ticks: { color: TICK } }, y: { ticks: { color: '#cbd5e1', font: { size: 10 } } } },
+                onClick: (e, elements) => {
+                    if (elements.length > 0) {
+                        const idx = elements[0].index;
+                        handleDrillDown('unit', gaps[idx].unidad);
+                    }
+                }
+            }
+        });
 
+        const clientMap = new Map();
+        unitMetrics.forEach(u => {
+            if (!clientMap.has(u.cliente)) clientMap.set(u.cliente, { total: 0, met: 0, visits: 0 });
+            const c = clientMap.get(u.cliente);
+            c.total += 1; c.visits += u.visitas;
+            if (u.estado === 'CUMPLE') c.met += 1;
+        });
+        const lowCov = Array.from(clientMap.entries()).map(([name, v]) => ({ name, coverage: v.total ? Math.round(v.met / v.total * 100) : 0, sub: v.total + ' unidades \u00b7 ' + v.visits + ' visitas' })).sort((a, b) => a.coverage - b.coverage).slice(0, 10);
+        const lcMax = Math.max(1, ...lowCov.map(x => x.coverage));
+        const lcEl = document.getElementById('low-coverage-clients');
+        if (lcEl) {
+            lcEl.innerHTML = lowCov.map((x, i) => `<div class="ranking-item" data-client="${x.name.replace(/"/g, '&quot;')}"><div><span class="rank-name">${i + 1}. ${x.name}</span><div class="kpi-sub">${x.sub}</div></div><span class="rank-num">${x.coverage}%</span></div><div class="rank-bar"><span style="width:${Math.round(x.coverage / (lcMax || 1) * 100)}%"></span></div>`).join('');
+            lcEl.querySelectorAll('.ranking-item').forEach(item => {
+                item.onclick = () => handleDrillDown('client', item.dataset.client);
+            });
+        }
 
+        // Same stable sort for the table
+        brechasAllRows = unitMetrics.filter(u => u.brecha > 0).sort((a, b) => {
+            if (b.brecha !== a.brecha) return b.brecha - a.brecha;
+            return a.unidad.localeCompare(b.unidad);
+        });
+        brechasPage = 1;
+        renderBrechasTable();
+    }
 
+    let brechasAllRows = [];
+    let brechasPage = 1;
+    const BRECHAS_PAGE_SIZE = 10;
+
+    function renderBrechasTable() {
+        const total = brechasAllRows.length;
+        const pages = Math.max(1, Math.ceil(total / BRECHAS_PAGE_SIZE));
+        brechasPage = Math.min(brechasPage, pages);
+        const start = (brechasPage - 1) * BRECHAS_PAGE_SIZE;
+        const slice = brechasAllRows.slice(start, start + BRECHAS_PAGE_SIZE);
+
+        const gapBody = document.getElementById('gap-table-body');
+        if (gapBody) {
+            gapBody.innerHTML = slice.map(u => `<tr class="row-clickable" data-unit="${u.unidad.replace(/"/g, '&quot;')}"><td>${u.cliente}</td><td>${u.unidad}</td><td>${u.departamento}</td><td>${u.meta}</td><td>${u.visitas}</td><td>${u.brecha}</td><td style="${u.klass}">${u.estado}</td></tr>`).join('');
+            gapBody.querySelectorAll('tr').forEach(tr => {
+                tr.onclick = () => handleDrillDown('unit', tr.dataset.unit);
+            });
+        }
+
+        const pager = document.getElementById('gap-pager');
+        if (!pager) return;
+        if (total === 0 || pages <= 1) { pager.innerHTML = ''; return; }
+        let btns = '';
+        for (let p = 1; p <= pages; p++) {
+            if (p === 1 || p === pages || (p >= brechasPage - 2 && p <= brechasPage + 2)) {
+                btns += '<button class="pager-btn' + (p === brechasPage ? ' active' : '') + '" data-bp="' + p + '">' + p + '</button>';
+            } else if (p === brechasPage - 3 || p === brechasPage + 3) {
+                btns += '<span class="pager-ellipsis">\u2026</span>';
+            }
+        }
+        pager.innerHTML = '<div class="pager-info">Mostrando <strong>' + (start + 1) + '\u2013' + Math.min(start + BRECHAS_PAGE_SIZE, total) + '</strong> de <strong>' + total + '</strong></div><div class="pager-controls">' + btns + '</div>';
+        pager.querySelectorAll('.pager-btn:not(.active)').forEach(btn => {
+            btn.addEventListener('click', () => { brechasPage = parseInt(btn.dataset.bp); renderBrechasTable(); });
+        });
+    }
+
+    let selectedInspectUser = '';
+
+    function renderOperativo(data) {
+        const zoneMap = {};
+        data.forEach(r => { if (r.zona) zoneMap[r.zona] = (zoneMap[r.zona] || 0) + 1; });
+        const zoneSorted = Object.entries(zoneMap).sort((a, b) => b[1] - a[1]).slice(0, 10);
+        const zoneMax = Math.max(1, ...zoneSorted.map(x => x[1]));
+        const zoneEl = document.getElementById('zone-ranking');
+        if (zoneEl) {
+            zoneEl.innerHTML = zoneSorted.map(([name, val], i) => `<div class="ranking-item" data-zona="${name.replace(/"/g, '&quot;')}"><div><span class="rank-name">${i + 1}. ${name}</span></div><span class="rank-num">${val}</span></div><div class="rank-bar"><span style="width:${Math.round(val / zoneMax * 100)}%"></span></div>`).join('');
+            zoneEl.querySelectorAll('.ranking-item').forEach(item => {
+                item.onclick = () => handleDrillDown('zona', item.dataset.zona);
+            });
+        }
+
+        const usrMap = {};
+        data.forEach(r => { usrMap[r.userName] = (usrMap[r.userName] || 0) + 1; });
+        const usrSorted = Object.entries(usrMap).sort((a, b) => b[1] - a[1]).slice(0, 10);
+        const usrMax = Math.max(1, ...usrSorted.map(x => x[1]));
+        const usrEl = document.getElementById('user-ranking');
+        if (usrEl) {
+            usrEl.innerHTML = usrSorted.map(([name, val], i) => `<div class="ranking-item" data-user="${name.replace(/"/g, '&quot;')}"><div><span class="rank-name">${i + 1}. ${name}</span></div><span class="rank-num">${val}</span></div><div class="rank-bar"><span style="width:${Math.round(val / usrMax * 100)}%"></span></div>`).join('');
+            usrEl.querySelectorAll('.ranking-item[data-user]').forEach(item => {
+                item.addEventListener('click', () => { 
+                    selectedInspectUser = item.dataset.user; 
+                    renderInspector(data, selectedInspectUser); 
+                    handleDrillDown('user', item.dataset.user);
+                });
+            });
+        }
+        if (!selectedInspectUser && usrSorted.length) selectedInspectUser = usrSorted[0][0];
+        renderInspector(data, selectedInspectUser);
+
+        if (charts.user) charts.user.destroy();
+        charts.user = new Chart(document.getElementById('chart-usuarios'), {
+            type: 'bar',
+            data: { labels: usrSorted.map(x => x[0]), datasets: [{ label: 'Visitas', data: usrSorted.map(x => x[1]), backgroundColor: '#67e8f9' }] },
+            options: { 
+                responsive: true, maintainAspectRatio: false, animation: anim, 
+                plugins: { legend: { labels: { color: '#e2e8f0' } }, datalabels: { anchor: 'end', align: 'top', color: '#e2e8f0', font: { family: FONT, size: 10, weight: '600' } } }, 
+                scales: { x: { ticks: { color: TICK, maxRotation: 35, font: { size: 9 } } }, y: { ticks: { color: TICK } } },
+                onClick: (e, elements) => {
+                    if (elements.length > 0) {
+                        const idx = elements[0].index;
+                        handleDrillDown('user', usrSorted[idx][0]);
+                    }
+                }
+            }
+        });
+
+        const macroMap = {};
+        data.forEach(r => { if (r.macrozona) macroMap[r.macrozona] = (macroMap[r.macrozona] || 0) + 1; });
+        const mSorted = Object.entries(macroMap).sort((a, b) => b[1] - a[1]).slice(0, 10);
+        if (charts.operMacro) charts.operMacro.destroy();
+        charts.operMacro = new Chart(document.getElementById('chart-oper-macro'), {
+            type: 'bar',
+            data: { labels: mSorted.map(x => x[0]), datasets: [{ label: 'Visitas', data: mSorted.map(x => x[1]), backgroundColor: '#818cf8' }] },
+            options: { 
+                responsive: true, maintainAspectRatio: false, animation: anim, 
+                plugins: { legend: { labels: { color: '#e2e8f0' } }, datalabels: { anchor: 'end', align: 'top', color: '#e2e8f0', font: { family: FONT, size: 10, weight: '600' } } }, 
+                scales: { x: { ticks: { color: TICK, maxRotation: 35, font: { size: 9 } } }, y: { ticks: { color: TICK } } },
+                onClick: (e, elements) => {
+                    if (elements.length > 0) {
+                        const idx = elements[0].index;
+                        handleDrillDown('macro', mSorted[idx][0]);
+                    }
+                }
+            }
+        });
+    }
+
+    function renderInspector(data, userName) {
+        const panel = document.getElementById('user-inspector');
+        if (!panel) return;
+        const userRows = data.filter(r => r.userName === userName);
+        if (!userName || !userRows.length) { panel.innerHTML = '<p class="kpi-sub">Selecciona un l\u00edder desde ranking.</p>'; return; }
+        const uClients = new Set(userRows.map(r => r.cliente));
+        const uUnits = new Set(userRows.map(r => r.unidad));
+        const lastDate = userRows.map(r => r.date).filter(Boolean).sort((a, b) => b - a)[0];
+        const zonesMap = {};
+        userRows.forEach(r => { if (r.zona) zonesMap[r.zona] = (zonesMap[r.zona] || 0) + 1; });
+        const topZones = Object.entries(zonesMap).sort((a, b) => b[1] - a[1]).slice(0, 4);
+        panel.innerHTML = '<p class="kpi-sub" style="margin-bottom:10px;color:var(--primary);">' + userName + '</p>' +
+            '<div class="inspector-kpis">' +
+            '<div class="inspector-kpi"><div class="kpi-sub">Visitas</div><div class="kpi-value">' + userRows.length + '</div></div>' +
+            '<div class="inspector-kpi"><div class="kpi-sub">Unidades</div><div class="kpi-value">' + uUnits.size + '</div></div>' +
+            '<div class="inspector-kpi"><div class="kpi-sub">Clientes</div><div class="kpi-value">' + uClients.size + '</div></div>' +
+            '<div class="inspector-kpi"><div class="kpi-sub">\u00daltima act.</div><div class="kpi-value" style="font-size:.9rem;">' + (lastDate ? formatDate(lastDate) : '-') + '</div></div>' +
+            '</div>' +
+            topZones.map(([z, v]) => '<div class="ranking-item"><span class="rank-name">' + z + '</span><span class="rank-num">' + v + '</span></div>').join('');
+    }
+
+    function renderCobertura(data, unitMetrics) {
+        const byMacro = new Map();
+        unitMetrics.forEach(u => {
+            const m = u.macrozona || 'Sin dato';
+            if (!byMacro.has(m)) byMacro.set(m, { total: 0, met: 0 });
+            const x = byMacro.get(m); x.total += 1; if (u.estado === 'CUMPLE') x.met += 1;
+        });
+        const macro = Array.from(byMacro.entries()).map(([name, v]) => ({ name, percent: v.total ? Math.round(v.met / v.total * 100) : 0 })).sort((a, b) => b.percent - a.percent);
+        if (charts.covMacro) charts.covMacro.destroy();
+        charts.covMacro = new Chart(document.getElementById('chart-cov-macro'), {
+            type: 'bar',
+            data: { labels: macro.map(x => x.name), datasets: [{ label: 'Cobertura %', data: macro.map(x => x.percent), backgroundColor: '#14b8a6' }] },
+            options: { 
+                indexAxis: 'y', responsive: true, maintainAspectRatio: false, animation: anim, 
+                plugins: { legend: { labels: { color: '#e2e8f0' } }, datalabels: { anchor: 'end', align: 'end', color: '#e2e8f0', font: { family: FONT, size: 10, weight: '600' }, formatter: v => v + '%' } }, 
+                scales: { x: { ticks: { color: TICK }, suggestedMax: 100 }, y: { ticks: { color: '#cbd5e1', font: { size: 10 } } } },
+                onClick: (e, elements) => {
+                    if (elements.length > 0) {
+                        const idx = elements[0].index;
+                        handleDrillDown('macro', macro[idx].name);
+                    }
+                }
+            }
+        });
+
+        const clientMap = new Map();
+        unitMetrics.forEach(u => {
+            if (!clientMap.has(u.cliente)) clientMap.set(u.cliente, { total: 0, met: 0 });
+            const c = clientMap.get(u.cliente); c.total += 1; if (u.estado === 'CUMPLE') c.met += 1;
+        });
+        const clients = Array.from(clientMap.entries()).map(([name, v]) => ({ name, coverage: v.total ? Math.round(v.met / v.total * 100) : 0 })).sort((a, b) => b.coverage - a.coverage).slice(0, 12);
+        if (charts.covClient) charts.covClient.destroy();
+        charts.covClient = new Chart(document.getElementById('chart-cov-client'), {
+            type: 'bar',
+            data: { labels: clients.map(x => x.name), datasets: [{ label: 'Cobertura %', data: clients.map(x => x.coverage), backgroundColor: '#22d3ee' }] },
+            options: { 
+                indexAxis: 'y', responsive: true, maintainAspectRatio: false, animation: anim, 
+                plugins: { legend: { labels: { color: '#e2e8f0' } }, datalabels: { anchor: 'end', align: 'end', color: '#e2e8f0', font: { family: FONT, size: 10, weight: '600' }, formatter: v => v + '%' } }, 
+                scales: { x: { ticks: { color: TICK }, suggestedMax: 100 }, y: { ticks: { color: '#cbd5e1', font: { size: 10 } } } },
+                onClick: (e, elements) => {
+                    if (elements.length > 0) {
+                        const idx = elements[0].index;
+                        handleDrillDown('client', clients[idx].name);
+                    }
+                }
+            }
+        });
+
+        const covRows = unitMetrics.sort((a, b) => b.percent - a.percent).slice(0, 300);
+        const covBody = document.getElementById('coverage-table-body');
+        if (covBody) {
+            covBody.innerHTML = covRows.map(u => `<tr class="row-clickable" data-unit="${u.unidad.replace(/"/g, '&quot;')}"><td>${u.cliente}</td><td>${u.unidad}</td><td>${u.macrozona}</td><td>${u.zona}</td><td>${u.meta}</td><td>${u.visitas}</td><td>${u.leadersCount}</td><td style="${u.klass}">${u.estado}</td></tr>`).join('');
+            covBody.querySelectorAll('tr').forEach(tr => {
+                tr.onclick = () => handleDrillDown('unit', tr.dataset.unit);
+            });
+        }
+    }
+
+    function renderUso(usageData) {
+        const top12 = usageData.slice(0, 12);
+        const usrMax = Math.max(1, ...top12.map(x => x.visits));
+        const usageEl = document.getElementById('usage-ranking');
+        if (usageEl) {
+            usageEl.innerHTML = top12.map((x, i) => `<div class="ranking-item" data-user="${x.leader.replace(/"/g, '&quot;')}"><div><span class="rank-name">${i + 1}. ${x.leader}</span><div class="kpi-sub">${x.daysCount} días activos · ${x.status}</div></div><span class="rank-num">${x.visits}</span></div><div class="rank-bar"><span style="width:${Math.round(x.visits / usrMax * 100)}%"></span></div>`).join('');
+            usageEl.querySelectorAll('.ranking-item').forEach(item => {
+                item.onclick = () => handleDrillDown('user', item.dataset.user);
+            });
+        }
+
+        const dist = { 'Activo': usageData.filter(x => x.status === 'Activo').length, 'Intermitente': usageData.filter(x => x.status === 'Intermitente').length, 'Inactivo': usageData.filter(x => x.status === 'Inactivo').length };
+        if (charts.usage) charts.usage.destroy();
+        charts.usage = new Chart(document.getElementById('chart-usage'), {
+            type: 'doughnut',
+            data: { labels: Object.keys(dist), datasets: [{ data: Object.values(dist), backgroundColor: ['#22c55e', '#f59e0b', '#f43f5e'], borderColor: '#020b1f', borderWidth: 3 }] },
+            options: { responsive: true, maintainAspectRatio: false, animation: anim, plugins: { legend: { position: 'bottom', labels: { color: '#8ab4cc', usePointStyle: true } }, datalabels: { color: '#fff', font: { family: FONT, size: 11, weight: '700' }, formatter: (val) => { const t = Object.values(dist).reduce((a, b) => a + b, 0); return t ? Math.round(val / t * 100) + '%' : ''; } } } }
+        });
+
+        const usageBody = document.getElementById('usage-table-body');
+        if (usageBody) usageBody.innerHTML = usageData.slice(0, 300).map(u => '<tr><td>' + u.leader + '</td><td>' + u.visits + '</td><td>' + u.daysCount + '</td><td>' + (u.last || '-') + '</td><td style="' + u.klass + '">' + u.status + '</td></tr>').join('');
+    }
+
+    let detailPage = 1;
+    const DETAIL_PAGE_SIZE = 20;
+
+    function renderDetalle(data) {
+        const countEl = document.getElementById('detail-count');
+        if (countEl) countEl.textContent = data.length + ' registros';
+
+        const total = data.length;
+        const pages = Math.max(1, Math.ceil(total / DETAIL_PAGE_SIZE));
+        detailPage = Math.min(detailPage, pages);
+        const start = (detailPage - 1) * DETAIL_PAGE_SIZE;
+        const slice = data.slice(start, start + DETAIL_PAGE_SIZE);
+
+        const tbody = document.getElementById('detail-table-body');
+        if (!tbody) return;
+
+        if (total === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:28px;color:var(--text-dim);"><i class="bx bx-search-alt" style="font-size:1.5rem;display:block;margin-bottom:8px;"></i>No se encontraron registros</td></tr>';
+        } else {
+            tbody.innerHTML = slice.map(row => {
+                const isOk = row.estado && row.estado.toUpperCase().includes('COMPLET');
+                const statusColor = isOk ? '#00d4ff' : '#ff1744';
+                return `<tr class="row-clickable" data-client="${row.cliente.replace(/"/g, '&quot;')}" data-unit="${row.unidad.replace(/"/g, '&quot;')}">` +
+                    '<td>' + formatDate(row.date) + '</td>' +
+                    '<td style="font-weight:600;color:#e8f4ff;">' + row.cliente + '</td>' +
+                    '<td>' + row.unidad + '</td>' +
+                    '<td><i class="bx bx-user" style="margin-right:5px;color:var(--primary);vertical-align:middle;"></i>' + row.userName + '</td>' +
+                    '<td>' + row.macrozona + '</td>' +
+                    '<td>' + row.zona + '</td>' +
+                    '<td style="color:var(--primary);font-family:monospace;">' + row.tiempoEstadia + '</td>' +
+                    '<td><span style="color:' + statusColor + ';border:1px solid ' + statusColor + ';padding:2px 10px;border-radius:20px;font-size:.72rem;letter-spacing:.5px;white-space:nowrap;">' + row.estado + '</span></td>' +
+                    '</tr>';
+            }).join('');
+            
+            tbody.querySelectorAll('tr').forEach(tr => {
+                tr.onclick = (e) => {
+                    // If clicked on client cell, filter by client, else by unit
+                    const cellIdx = e.target.cellIndex;
+                    if (cellIdx === 1) handleDrillDown('client', tr.dataset.client);
+                    else handleDrillDown('unit', tr.dataset.unit);
+                };
+            });
+        }
+
+        const pager = document.getElementById('detail-pager');
+        if (!pager || total === 0 || pages <= 1) { if (pager) pager.innerHTML = ''; return; }
+        let pageButtons = '';
+        for (let p = 1; p <= pages; p++) {
+            if (p === 1 || p === pages || (p >= detailPage - 2 && p <= detailPage + 2)) {
+                pageButtons += '<button class="pager-btn' + (p === detailPage ? ' active' : '') + '" data-dp="' + p + '">' + p + '</button>';
+            } else if (p === detailPage - 3 || p === detailPage + 3) {
+                pageButtons += '<span class="pager-ellipsis">\u2026</span>';
+            }
+        }
+        pager.innerHTML = '<div class="pager-info">Mostrando <strong>' + (start + 1) + '\u2013' + Math.min(start + DETAIL_PAGE_SIZE, total) + '</strong> de <strong>' + total + '</strong></div><div class="pager-controls">' + pageButtons + '</div>';
+        pager.querySelectorAll('.pager-btn:not(.active)').forEach(btn => {
+            btn.addEventListener('click', () => { detailPage = parseInt(btn.dataset.dp); renderDetalle(getFilteredData()); });
+        });
+    }
     // ─── Pagination state for Reports ────────────────────────────
     let reportsCurrentPage = 1;
     const REPORTS_PAGE_SIZE = 20;
@@ -658,7 +1220,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const statusColor = isOk ? '#00f3ff' : '#ff003c';
 
                 tr.innerHTML = `
-                    <td>${row.date ? row.date.toLocaleDateString('es-PE') : 'N/A'}</td>
+                    <td>${formatDate(row.date)}</td>
                     <td style="font-weight: 600; color: #fff;">${row.cliente}</td>
                     <td>${row.unidad}</td>
                     <td><i class='bx bx-user' style="margin-right:4px;color:var(--primary);vertical-align:middle;"></i>${row.userName}</td>
@@ -953,285 +1515,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // (subtractDuration is now imported from utils.js)
 
-
-    function updateCharts(counts) {
-        const FONT = "'Orbitron', 'Inter', sans-serif";
-        const FONT_SM = "'Inter', sans-serif";
-        const CYAN = 'rgba(0,212,255,';
-        const GRID = 'rgba(0,212,255,0.07)';
-        const TICK = '#4a7a9b';
-
-        // Neon palette (HSLA for better control)
-        const palette = [
-            'hsla(190, 100%, 50%, 0.8)',  // Cyan
-            'hsla(345, 100%, 50%, 0.8)',  // Red
-            'hsla(270, 100%, 65%, 0.8)',  // Purple
-            'hsla(45,  100%, 55%, 0.8)',  // Gold
-            'hsla(150, 100%, 50%, 0.8)',  // Green
-            'hsla(210, 100%, 60%, 0.8)',  // Blue
-            'hsla(15,  100%, 55%, 0.8)',  // Orange
-            'hsla(320, 100%, 60%, 0.8)',  // Pink
-            'hsla(180, 100%, 40%, 0.8)',  // Teal
-            'hsla(280, 100%, 15%, 0.8)',  // Dark Purple
-        ];
-        const paletteBorder = palette.map(c => c.replace('0.8)', '1)'));
-
-        const processData = (obj) => {
-            const sorted = Object.entries(obj).sort((a, b) => b[1] - a[1]).slice(0, 10);
-            return {
-                labels: sorted.map(k => k[0]),
-                data: sorted.map(v => v[1]),
-            };
-        };
-
-        const cData = processData(counts.clients);
-        const uData = processData(counts.units);
-        const usrData = processData(counts.users);
-
-        const totalUsers = usrData.data.reduce((a, b) => a + b, 0) || 1;
-
-        /* ─── Shared animation ───────────────────────────────── */
-        const anim = { duration: 800, easing: 'easeOutQuart' };
-
-        /* ─── 1. Distribución por Cliente (Horizontal Bar) ───── */
-        if (charts.client) charts.client.destroy();
-        charts.client = new Chart(document.getElementById('chart-clientes'), {
-            type: 'bar',
-            data: {
-                labels: cData.labels,
-                datasets: [{
-                    label: 'Registros',
-                    data: cData.data,
-                    backgroundColor: cData.data.map((_, i) => palette[i % palette.length].replace('0.8)', '0.15)')),
-                    borderColor: cData.data.map((_, i) => palette[i % palette.length]),
-                    borderWidth: 2,
-                    borderRadius: 4,
-                    borderSkipped: false,
-                    hoverBackgroundColor: cData.data.map((_, i) => palette[i % palette.length].replace('0.8)', '0.35)')),
-                }]
-            },
-            options: {
-                indexAxis: 'y',
-                animation: anim,
-                responsive: true,
-                maintainAspectRatio: false,
-                layout: { padding: { right: 48 } },
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        backgroundColor: 'rgba(4,16,42,0.92)',
-                        borderColor: 'rgba(0,212,255,0.3)',
-                        borderWidth: 1,
-                        titleColor: '#00d4ff',
-                        bodyColor: '#e8f4ff',
-                        titleFont: { family: FONT, size: 11 },
-                        bodyFont: { family: FONT_SM, size: 12 },
-                        callbacks: {
-                            label: ctx => `  ${ctx.parsed.x} registros`,
-                        }
-                    },
-                    // Data labels – inline value at end of bar
-                    datalabels: {
-                        anchor: 'end',
-                        align: 'end',
-                        color: '#00d4ff',
-                        font: { family: FONT, size: 10, weight: '600' },
-                        formatter: val => val,
-                        padding: { right: 4 },
-                    }
-                },
-                scales: {
-                    x: {
-                        beginAtZero: true,
-                        grid: { color: GRID, drawBorder: false },
-                        ticks: { color: TICK, font: { family: FONT_SM, size: 10 }, stepSize: 1 },
-                        border: { display: false },
-                    },
-                    y: {
-                        grid: { display: false },
-                        ticks: {
-                            color: '#8ab4cc',
-                            font: { family: FONT_SM, size: 10 },
-                            callback: function (val) {
-                                const lbl = this.getLabelForValue(val);
-                                return lbl.length > 28 ? lbl.substring(0, 28) + '…' : lbl;
-                            }
-                        },
-                        border: { display: false },
-                    }
-                }
-            },
-        });
-
-        /* ─── 2. Por Unidad (Vertical Bar + gradient) ─────────── */
-        if (charts.unit) charts.unit.destroy();
-        charts.unit = new Chart(document.getElementById('chart-unidades'), {
-            type: 'bar',
-            data: {
-                labels: uData.labels,
-                datasets: [{
-                    label: 'Registros',
-                    data: uData.data,
-                    backgroundColor: palette,
-                    borderColor: paletteBorder,
-                    borderWidth: 1,
-                    borderRadius: 8,
-                    borderSkipped: false,
-                }]
-            },
-            options: {
-                animation: anim,
-                responsive: true,
-                maintainAspectRatio: false,
-                layout: { padding: { top: 28 } },
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        backgroundColor: 'rgba(4,16,42,0.92)',
-                        borderColor: 'rgba(0,212,255,0.3)',
-                        borderWidth: 1,
-                        titleColor: '#00d4ff',
-                        bodyColor: '#e8f4ff',
-                        titleFont: { family: FONT, size: 11 },
-                        callbacks: { label: ctx => `  ${ctx.parsed.y} registros` }
-                    },
-                    datalabels: {
-                        anchor: 'end',
-                        align: 'top',
-                        color: '#e8f4ff',
-                        font: { family: FONT, size: 11, weight: '700' },
-                        formatter: val => val,
-                    }
-                },
-                scales: {
-                    x: {
-                        grid: { display: false },
-                        ticks: {
-                            color: '#8ab4cc',
-                            font: { family: FONT_SM, size: 9 },
-                            maxRotation: 35,
-                            callback: function (val) {
-                                const lbl = this.getLabelForValue(val);
-                                return lbl.length > 14 ? lbl.substring(0, 14) + '…' : lbl;
-                            }
-                        },
-                        border: { display: false },
-                    },
-                    y: {
-                        beginAtZero: true,
-                        grid: { color: GRID, drawBorder: false },
-                        ticks: { color: TICK, font: { family: FONT_SM, size: 10 }, stepSize: 1 },
-                        border: { display: false },
-                    }
-                }
-            },
-        });
-
-        /* ─── 3. Top Usuarios (Doughnut + % labels) ───────────── */
-        if (charts.user) charts.user.destroy();
-        charts.user = new Chart(document.getElementById('chart-usuarios'), {
-            type: 'doughnut',
-            data: {
-                labels: usrData.labels,
-                datasets: [{
-                    data: usrData.data,
-                    backgroundColor: palette,
-                    borderColor: '#020b1f',
-                    borderWidth: 3,
-                    hoverBorderColor: '#00d4ff',
-                    hoverOffset: 12,
-                }]
-            },
-            options: {
-                animation: { ...anim, animateRotate: true, animateScale: true },
-                responsive: true,
-                maintainAspectRatio: false,
-                cutout: '58%',
-                plugins: {
-                    legend: {
-                        position: 'right',
-                        labels: {
-                            color: '#8ab4cc',
-                            font: { family: FONT_SM, size: 11 },
-                            boxWidth: 12,
-                            padding: 14,
-                            usePointStyle: true,
-                            pointStyleWidth: 8,
-                        }
-                    },
-                    tooltip: {
-                        backgroundColor: 'rgba(4,16,42,0.92)',
-                        borderColor: 'rgba(0,212,255,0.3)',
-                        borderWidth: 1,
-                        titleColor: '#00d4ff',
-                        bodyColor: '#e8f4ff',
-                        titleFont: { family: FONT, size: 11 },
-                        callbacks: {
-                            label: ctx => {
-                                const pct = ((ctx.parsed / totalUsers) * 100).toFixed(1);
-                                return `  ${ctx.label}: ${ctx.parsed} (${pct}%)`;
-                            }
-                        }
-                    },
-                    datalabels: {
-                        color: (ctx) => {
-                            // Small slices get a slightly brighter label for readability
-                            const pct = (ctx.dataset.data[ctx.dataIndex] / totalUsers) * 100;
-                            return pct < 6 ? '#ffffff' : '#fff';
-                        },
-                        font: (ctx) => {
-                            const pct = (ctx.dataset.data[ctx.dataIndex] / totalUsers) * 100;
-                            return {
-                                family: FONT,
-                                size: pct < 6 ? 9 : 10,
-                                weight: '700',
-                            };
-                        },
-                        // Always anchor outside for small slices so they don't get hidden
-                        anchor: (ctx) => {
-                            const pct = (ctx.dataset.data[ctx.dataIndex] / totalUsers) * 100;
-                            return pct < 8 ? 'end' : 'center';
-                        },
-                        align: (ctx) => {
-                            const pct = (ctx.dataset.data[ctx.dataIndex] / totalUsers) * 100;
-                            return pct < 8 ? 'end' : 'center';
-                        },
-                        offset: (ctx) => {
-                            const pct = (ctx.dataset.data[ctx.dataIndex] / totalUsers) * 100;
-                            return pct < 8 ? 8 : 0;
-                        },
-                        formatter: (val, ctx) => {
-                            if (!totalUsers || !val) return '';
-                            const pct = ((val / totalUsers) * 100).toFixed(1);
-                            return parseFloat(pct) >= 3 ? `${pct}%` : '';
-                        },
-                        textShadowBlur: 6,
-                        textShadowColor: 'rgba(0,0,0,0.9)',
-                        padding: 2,
-                        clamp: true,
-                    }
-                }
-            },
-            plugins: [{
-                id: 'centerText',
-                beforeDraw: (chart) => {
-                    const { width, height, ctx } = chart;
-                    ctx.save();
-                    ctx.font = `600 1.5rem ${FONT}`;
-                    ctx.fillStyle = '#00d4ff';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    const text = totalUsers.toString();
-                    ctx.fillText(text, width / 2, height / 2 - 8);
-
-                    ctx.font = `400 0.7rem ${FONT_SM}`;
-                    ctx.fillStyle = '#8ab4cc';
-                    ctx.fillText('TOTAL', width / 2, height / 2 + 15);
-                    ctx.restore();
-                }
-            }]
-        });
-    }
 });
 
 /* ═══════════════════════════════════════════════════════════════

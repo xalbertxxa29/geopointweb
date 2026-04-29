@@ -59,6 +59,12 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a href="uploader.html" class="nav-link">
+                            <i class='bx bxs-cloud-upload'></i>
+                            <span class="link-text">Inyector Masivo</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a href="#" class="nav-link">
                             <i class='bx bxs-cog'></i>
                             <span class="link-text">Configuración</span>
@@ -121,6 +127,24 @@
                                 </div>
                             </div>
                             <div class="filter-group">
+                                <label>Macrozona</label>
+                                <div class="select-wrapper">
+                                    <select id="filter-macro" class="modern-select">
+                                        <option value="">Todas</option>
+                                    </select>
+                                    <i class='bx bx-chevron-down'></i>
+                                </div>
+                            </div>
+                            <div class="filter-group">
+                                <label>Zona</label>
+                                <div class="select-wrapper">
+                                    <select id="filter-zona" class="modern-select">
+                                        <option value="">Todas</option>
+                                    </select>
+                                    <i class='bx bx-chevron-down'></i>
+                                </div>
+                            </div>
+                            <div class="filter-group">
                                 <label>Cliente</label>
                                 <div class="select-wrapper">
                                     <select id="filter-client" class="modern-select">
@@ -147,48 +171,293 @@
                                     <i class='bx bx-chevron-down'></i>
                                 </div>
                             </div>
-                            <button id="apply-filters" class="btn-primary">
-                                <i class='bx bx-check'></i> Aplicar
-                            </button>
-                            <button id="clear-filters" class="btn-ghost" title="Limpiar filtros">
-                                <i class='bx bx-eraser'></i> Limpiar
-                            </button>
+                            <div class="filter-actions">
+                                <button id="apply-filters" class="btn-primary">
+                                    <i class='bx bx-check'></i> Aplicar
+                                </button>
+                                <button id="clear-filters" class="btn-ghost" title="Limpiar filtros">
+                                    <i class='bx bx-eraser'></i> Limpiar
+                                </button>
+                            </div>
+                        </div>
+                        <!-- Active Filter Pills -->
+                        <div id="active-filters-pills" class="active-filters-container">
+                            <!-- Pills will be injected here -->
                         </div>
                     </div>
-
-                    <!-- KPI Charts Grid -->
-                    <div class="indicators-grid" id="indicators-grid" style="display: none;">
-                        <!-- Client Indicators -->
-                        <div class="glass-card full-span">
-                            <div class="card-header">
-                                <h3><i class='bx bxs-business'></i> Distribución por Cliente</h3>
-                                <button class="card-action"><i class='bx bx-dots-vertical-rounded'></i></button>
-                            </div>
-                            <div class="chart-container large">
-                                <canvas id="chart-clientes"></canvas>
-                            </div>
-                        </div>
-
-                        <!-- Unit Indicators -->
-                        <div class="glass-card">
-                            <div class="card-header">
-                                <h3><i class='bx bxs-buildings'></i> Por Unidad</h3>
-                            </div>
-                            <div class="chart-container">
-                                <canvas id="chart-unidades"></canvas>
-                            </div>
-                        </div>
-
-                        <!-- User Indicators -->
-                        <div class="glass-card">
-                            <div class="card-header">
-                                <h3><i class='bx bxs-user-account'></i> Top Usuarios</h3>
-                            </div>
-                            <div class="chart-container">
-                                <canvas id="chart-usuarios"></canvas>
-                            </div>
-                        </div>
                     </div>
+
+                    <!-- ══ DASHBOARD VIEW ══════════════════════════════ -->
+                    <div id="indicators-grid" style="display: none;">
+
+                        <!-- KPI Strip (modelo LIDERZONAL) -->
+                        <div class="kpi-strip" id="kpi-strip">
+                            <div class="kpi-card">
+                                <div class="kpi-label">Total Visitas</div>
+                                <div class="kpi-value" id="kpi-visits">0</div>
+                                <div class="kpi-sub">Registros filtrados</div>
+                            </div>
+                            <div class="kpi-card">
+                                <div class="kpi-label">Clientes</div>
+                                <div class="kpi-value" id="kpi-clients">0</div>
+                                <div class="kpi-sub">Clientes únicos</div>
+                            </div>
+                            <div class="kpi-card">
+                                <div class="kpi-label">Unidades</div>
+                                <div class="kpi-value" id="kpi-units">0</div>
+                                <div class="kpi-sub">Unidades únicas</div>
+                            </div>
+                            <div class="kpi-card">
+                                <div class="kpi-label">Líderes</div>
+                                <div class="kpi-value" id="kpi-leaders">0</div>
+                                <div class="kpi-sub">Con actividad</div>
+                            </div>
+                            <div class="kpi-card">
+                                <div class="kpi-label">Cobertura Meta</div>
+                                <div class="kpi-value" id="kpi-coverage">0%</div>
+                                <div class="kpi-sub" id="kpi-coverage-sub">0 cumplen</div>
+                            </div>
+                            <div class="kpi-card">
+                                <div class="kpi-label">Unidades Brecha</div>
+                                <div class="kpi-value" id="kpi-gap">0</div>
+                                <div class="kpi-sub">Parcial o no cumple</div>
+                            </div>
+                            <div class="kpi-card">
+                                <div class="kpi-label">Uso Activo</div>
+                                <div class="kpi-value" id="kpi-usage">0%</div>
+                                <div class="kpi-sub">Líderes activos</div>
+                            </div>
+                            <div class="kpi-card">
+                                <div class="kpi-label">Permanencia Prom.</div>
+                                <div class="kpi-value" id="kpi-stay">0m</div>
+                                <div class="kpi-sub">Duración media</div>
+                            </div>
+                        </div>
+
+                        <!-- Dashboard Tabs (6 pestañas) -->
+                        <div class="dash-tabs" id="dash-tabs">
+                            <button class="dash-tab active" data-tab="resumen"><i class='bx bxs-dashboard'></i> Resumen Ejecutivo</button>
+                            <button class="dash-tab" data-tab="brechas"><i class='bx bx-error-alt'></i> Brechas</button>
+                            <button class="dash-tab" data-tab="operativo"><i class='bx bxs-group'></i> Equipo Operativo</button>
+                            <button class="dash-tab" data-tab="cobertura"><i class='bx bx-target-lock'></i> Cobertura</button>
+                            <button class="dash-tab" data-tab="uso"><i class='bx bx-pulse'></i> Uso de la herramienta</button>
+                            <button class="dash-tab" data-tab="detalle"><i class='bx bx-table'></i> Detalle</button>
+                        </div>
+
+                        <!-- ── TAB: Resumen Ejecutivo ── -->
+                        <div class="dash-module active" id="mod-resumen">
+                            <div class="dash-grid dash-grid-12">
+                                <!-- Tendencia diaria -->
+                                <div class="glass-card dash-col-7">
+                                    <div class="card-header">
+                                        <h3><i class='bx bx-line-chart'></i> Tendencia de visitas por día</h3>
+                                        <select id="trend-mode" class="mini-select">
+                                            <option value="daily">Por día</option>
+                                            <option value="cumulative">Acumulado</option>
+                                        </select>
+                                    </div>
+                                    <div class="chart-container large"><canvas id="chart-trend"></canvas></div>
+                                </div>
+                                <!-- Estado de cumplimiento -->
+                                <div class="glass-card dash-col-5">
+                                    <div class="card-header">
+                                        <h3><i class='bx bx-check-circle'></i> Estado de cumplimiento</h3>
+                                    </div>
+                                    <div class="chart-container large"><canvas id="chart-status"></canvas></div>
+                                </div>
+                                <!-- Por Macrozona -->
+                                <div class="glass-card dash-col-4">
+                                    <div class="card-header">
+                                        <h3><i class='bx bx-map'></i> Visitas por macrozona</h3>
+                                        <span class="kpi-sub">Clic para filtrar.</span>
+                                    </div>
+                                    <div class="chart-container large"><canvas id="chart-macrozona"></canvas></div>
+                                </div>
+                                <!-- Por día de semana -->
+                                <div class="glass-card dash-col-4">
+                                    <div class="card-header">
+                                        <h3><i class='bx bx-calendar'></i> Visitas por día de semana</h3>
+                                        <span class="kpi-sub">Patrón operativo.</span>
+                                    </div>
+                                    <div class="chart-container large"><canvas id="chart-weekday"></canvas></div>
+                                </div>
+                                <!-- Lima vs Provincia -->
+                                <div class="glass-card dash-col-4">
+                                    <div class="card-header">
+                                        <h3><i class='bx bx-globe'></i> Lima vs Provincia</h3>
+                                        <span class="kpi-sub">Nivel de cumplimiento.</span>
+                                    </div>
+                                    <div class="chart-container large"><canvas id="chart-jurisdiccion"></canvas></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ── TAB: Brechas ── -->
+                        <div class="dash-module" id="mod-brechas">
+                            <div class="dash-grid dash-grid-12">
+                                <div class="glass-card dash-col-6">
+                                    <div class="card-header">
+                                        <h3><i class='bx bx-bar-chart-alt-2'></i> Top unidades con mayor brecha</h3>
+                                    </div>
+                                    <div class="chart-container large"><canvas id="chart-gap-units"></canvas></div>
+                                </div>
+                                <div class="glass-card dash-col-6">
+                                    <div class="card-header">
+                                        <h3><i class='bx bx-building'></i> Clientes con menor cobertura</h3>
+                                    </div>
+                                    <div class="ranking-list" id="low-coverage-clients"></div>
+                                </div>
+                                <div class="glass-card dash-col-12">
+                                    <div class="card-header">
+                                        <h3><i class='bx bx-grid-alt'></i> Matriz de incumplimiento por unidad</h3>
+                                        <span class="kpi-sub">10 registros por página</span>
+                                    </div>
+                                    <div class="table-responsive">
+                                        <table class="modern-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>CLIENTE</th>
+                                                    <th>UNIDAD</th>
+                                                    <th>DEPARTAMENTO</th>
+                                                    <th>META</th>
+                                                    <th>VISITAS</th>
+                                                    <th>BRECHA</th>
+                                                    <th>ESTADO</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="gap-table-body"></tbody>
+                                        </table>
+                                    </div>
+                                    <div id="gap-pager" class="pager"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ── TAB: Equipo Operativo ── -->
+                        <div class="dash-module" id="mod-operativo">
+                            <div class="dash-grid dash-grid-12">
+                                <div class="glass-card dash-col-4">
+                                    <div class="card-header"><h3><i class='bx bx-map-alt'></i> Ranking de zonas</h3></div>
+                                    <div class="ranking-list" id="zone-ranking"></div>
+                                </div>
+                                <div class="glass-card dash-col-4">
+                                    <div class="card-header"><h3><i class='bx bx-user'></i> Ranking Líderes Zonales</h3></div>
+                                    <div class="ranking-list" id="user-ranking"></div>
+                                </div>
+                                <div class="glass-card dash-col-4">
+                                    <div class="card-header"><h3><i class='bx bx-search-alt'></i> Inspector del Líder</h3></div>
+                                    <div class="inspector-panel" id="user-inspector">
+                                        <p class="kpi-sub">Selecciona un líder desde ranking.</p>
+                                    </div>
+                                </div>
+                                <div class="glass-card dash-col-6">
+                                    <div class="card-header"><h3><i class='bx bxs-user-account'></i> Top líderes por visitas</h3></div>
+                                    <div class="chart-container large"><canvas id="chart-usuarios"></canvas></div>
+                                </div>
+                                <div class="glass-card dash-col-6">
+                                    <div class="card-header"><h3><i class='bx bxs-buildings'></i> Macrozonas por visitas</h3></div>
+                                    <div class="chart-container large"><canvas id="chart-oper-macro"></canvas></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ── TAB: Cobertura ── -->
+                        <div class="dash-module" id="mod-cobertura">
+                            <div class="dash-grid dash-grid-12">
+                                <div class="glass-card dash-col-5">
+                                    <div class="card-header"><h3><i class='bx bx-target-lock'></i> Cobertura por macrozona</h3></div>
+                                    <div class="chart-container large"><canvas id="chart-cov-macro"></canvas></div>
+                                </div>
+                                <div class="glass-card dash-col-7">
+                                    <div class="card-header"><h3><i class='bx bx-building-house'></i> Cobertura por cliente</h3></div>
+                                    <div class="chart-container large"><canvas id="chart-cov-client"></canvas></div>
+                                </div>
+                                <div class="glass-card dash-col-12">
+                                    <div class="card-header">
+                                        <h3><i class='bx bx-list-check'></i> Detalle de cobertura por unidad</h3>
+                                        <span class="kpi-sub">Máximo 300 filas</span>
+                                    </div>
+                                    <div class="table-responsive">
+                                        <table class="modern-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Cliente</th>
+                                                    <th>Unidad</th>
+                                                    <th>Macrozona</th>
+                                                    <th>Zona</th>
+                                                    <th>Meta</th>
+                                                    <th>Visitas</th>
+                                                    <th>Líderes</th>
+                                                    <th>Estado</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="coverage-table-body"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ── TAB: Uso de la herramienta ── -->
+                        <div class="dash-module" id="mod-uso">
+                            <div class="dash-grid dash-grid-12">
+                                <div class="glass-card dash-col-5">
+                                    <div class="card-header"><h3><i class='bx bx-trophy'></i> Ranking de uso</h3></div>
+                                    <div class="ranking-list" id="usage-ranking"></div>
+                                </div>
+                                <div class="glass-card dash-col-7">
+                                    <div class="card-header"><h3><i class='bx bx-doughnut-chart'></i> Distribución de uso</h3></div>
+                                    <div class="chart-container large"><canvas id="chart-usage"></canvas></div>
+                                </div>
+                                <div class="glass-card dash-col-12">
+                                    <div class="card-header"><h3><i class='bx bx-table'></i> Detalle de uso por líder</h3></div>
+                                    <div class="table-responsive">
+                                        <table class="modern-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Líder Zonal</th>
+                                                    <th>Visitas</th>
+                                                    <th>Días con actividad</th>
+                                                    <th>Última actividad</th>
+                                                    <th>Clasificación</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="usage-table-body"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ── TAB: Detalle ── -->
+                        <div class="dash-module" id="mod-detalle">
+                            <div class="glass-card">
+                                <div class="card-header">
+                                    <h3><i class='bx bx-list-ul'></i> Trazabilidad completa</h3>
+                                    <span class="kpi-sub" id="detail-count">0 registros</span>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="modern-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Fecha</th>
+                                                <th>Cliente</th>
+                                                <th>Unidad</th>
+                                                <th>Usuario</th>
+                                                <th>Macrozona</th>
+                                                <th>Zona</th>
+                                                <th>Estadía</th>
+                                                <th>Estado</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="detail-table-body"></tbody>
+                                    </table>
+                                </div>
+                                <div id="detail-pager" class="table-pager"></div>
+                            </div>
+                        </div>
+
+                    </div><!-- /indicators-grid -->
 
                     <!-- Reports Section (Initially Hidden) -->
                     <div id="reports-view" style="display: none;">
@@ -690,30 +959,8 @@
                     </div><!-- /audit-view -->
 
 
-                    <div class="glass-panel table-section" id="table-section" style="display: none;">
-                        <div class="panel-header">
-                            <h3><i class='bx bx-list-ul'></i> Registro Detallado</h3>
-                            <button class="btn-icon"><i class='bx bx-export'></i></button>
-                        </div>
-                        <div class="table-responsive">
-                            <table class="modern-table">
-                                <thead>
-                                    <tr>
-                                        <th>Fecha</th>
-                                        <th>Cliente</th>
-                                        <th>Unidad</th>
-                                        <th>Usuario</th>
-                                        <th>Tarea</th>
-                                        <th>Estadía</th>
-                                        <th>Estado</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="table-body">
-                                    <!-- Dynamically filled -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                    <!-- table-section kept as hidden placeholder for compatibility -->
+                    <div id="table-section" style="display:none;"></div>
                 </div>
 
                 <footer class="dashboard-footer">
