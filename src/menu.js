@@ -410,19 +410,11 @@ document.addEventListener('DOMContentLoaded', () => {
             // Add data
             data.forEach(item => {
                 const row = worksheet.addRow({
-<<<<<<< HEAD
                     fecha: formatDate(item.date),
                     cliente: item.cliente,
                     unidad: item.unidad,
                     usuario: item.userName,
                     tarea: item.descripcion,
-=======
-                    fecha: item.date ? item.date.toLocaleDateString('es-PE') : 'N/A',
-                    cliente: (item.cliente || '').toUpperCase(),
-                    unidad: (item.unidad || '').toUpperCase(),
-                    usuario: (item.userName || '').toUpperCase(),
-                    tarea: (item.descripcion || '').toUpperCase(),
->>>>>>> cb619570ae8ae2bd7022e77b9098382c01fb147a
                     estadia: item.tiempoEstadia,
                     estado: item.estado
                 });
@@ -763,7 +755,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('kpi-stay').textContent = avgStay >= 60 ? Math.floor(avgStay / 60) + 'h ' + (avgStay % 60) + 'm' : avgStay + 'm';
     }
 
-<<<<<<< HEAD
     function renderResumen(data, unitMetrics) {
         const trendMode = trendModeEl ? trendModeEl.value : 'daily';
         const byDay = new Map();
@@ -772,31 +763,6 @@ document.addEventListener('DOMContentLoaded', () => {
         let tLabels = trend.map(x => { const d = new Date(x[0] + 'T12:00:00'); return d.toLocaleDateString('es-PE', { month: 'short', day: 'numeric' }); });
         let tValues = trend.map(x => x[1]);
         if (trendMode === 'cumulative') { let acc = 0; tValues = tValues.map(v => acc += v); }
-=======
-        if (total === 0) {
-            tableBody.innerHTML = `
-                <tr><td colspan="7" style="text-align:center;padding:28px;color:var(--text-dim);">
-                    <i class='bx bx-search-alt' style="font-size:1.5rem;display:block;margin-bottom:8px;"></i>
-                    No se encontraron registros
-                </td></tr>`;
-        } else {
-            slice.forEach(row => {
-                const isOk = row.estado && row.estado.toUpperCase().includes('COMPLET');
-                const statusColor = isOk ? '#00d4ff' : '#ff1744';
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${row.date ? row.date.toLocaleDateString('es-PE') : 'N/A'}</td>
-                    <td style="font-weight:600;color:#e8f4ff;">${(row.cliente || '').toUpperCase()}</td>
-                    <td>${(row.unidad || '').toUpperCase()}</td>
-                    <td><i class='bx bx-user' style="margin-right:5px;color:var(--primary);vertical-align:middle;"></i>${(row.userName || '').toUpperCase()}</td>
-                    <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(row.descripcion || '').toUpperCase()}">${(row.descripcion || '').toUpperCase()}</td>
-                    <td style="color:var(--primary);font-family:monospace;">${row.tiempoEstadia}</td>
-                    <td><span style="color:${statusColor};border:1px solid ${statusColor};padding:2px 10px;border-radius:20px;font-size:.72rem;letter-spacing:.5px;white-space:nowrap;">${row.estado}</span></td>
-                `;
-                tableBody.appendChild(tr);
-            });
-        }
->>>>>>> cb619570ae8ae2bd7022e77b9098382c01fb147a
 
         if (charts.trend) charts.trend.destroy();
         charts.trend = new Chart(document.getElementById('chart-trend'), {
@@ -1254,19 +1220,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const statusColor = isOk ? '#00f3ff' : '#ff003c';
 
                 tr.innerHTML = `
-<<<<<<< HEAD
                     <td>${formatDate(row.date)}</td>
                     <td style="font-weight: 600; color: #fff;">${row.cliente}</td>
                     <td>${row.unidad}</td>
                     <td><i class='bx bx-user' style="margin-right:4px;color:var(--primary);vertical-align:middle;"></i>${row.userName}</td>
                     <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${row.descripcion}">${row.descripcion}</td>
-=======
-                    <td>${row.date ? row.date.toLocaleDateString('es-PE') : 'N/A'}</td>
-                    <td style="font-weight: 600; color: #fff;">${(row.cliente || '').toUpperCase()}</td>
-                    <td>${(row.unidad || '').toUpperCase()}</td>
-                    <td><i class='bx bx-user' style="margin-right:4px;color:var(--primary);vertical-align:middle;"></i>${(row.userName || '').toUpperCase()}</td>
-                    <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(row.descripcion || '').toUpperCase()}">${(row.descripcion || '').toUpperCase()}</td>
->>>>>>> cb619570ae8ae2bd7022e77b9098382c01fb147a
                     <td style="color: var(--primary); font-family: monospace;">${row.tiempoEstadia}</td>
                     <td><span style="color:${statusColor}; border:1px solid ${statusColor}; padding:2px 10px; border-radius:20px; font-size:.72rem; letter-spacing:.5px; white-space:nowrap;">${row.estado}</span></td>
                     <td class="action-cell">
